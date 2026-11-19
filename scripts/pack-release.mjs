@@ -59,7 +59,8 @@ for (const rel of [...closure, ...URL_ASSETS]) {
 for (const dir of [...STATIC_DIRS, ...EXTRA_DIRS]) {
   cpSync(join(ROOT, dir), join(DIST, dir), { recursive: true })
 }
-for (const file of ['tianshu.plugin.json', 'LICENSE', 'README.md', 'PUBLISH.md']) {
+// PUBLISH.md 是仓库的发布记录，不进包：否则改一次文档就得重打包、哈希又变。
+for (const file of ['tianshu.plugin.json', 'LICENSE', 'README.md']) {
   cpSync(join(ROOT, file), join(DIST, file))
 }
 
@@ -91,7 +92,7 @@ const release = {
 }
 writeFileSync(join(DIST, 'xiaosi.release.json'), JSON.stringify(release, null, 2) + '\n')
 
-const files = [...closure, ...URL_ASSETS, ...STATIC_DIRS, ...EXTRA_DIRS, 'tianshu.plugin.json', 'package.json', 'LICENSE', 'README.md', 'PUBLISH.md', 'xiaosi.release.json']
+const files = [...closure, ...URL_ASSETS, ...STATIC_DIRS, ...EXTRA_DIRS, 'tianshu.plugin.json', 'package.json', 'LICENSE', 'README.md', 'xiaosi.release.json']
 console.log(`dist/ 就绪：入口闭包 ${closure.size} 个 + URL 引用 ${URL_ASSETS.length} 个 + 目录 ${STATIC_DIRS.length + EXTRA_DIRS.length} 个 + 清单与元数据`)
 console.log(`permission_digest: ${permissionDigest}`)
 console.log(`release_id: ${releaseId}  source_commit: ${sourceCommit.slice(0, 12)}`)
