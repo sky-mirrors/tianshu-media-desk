@@ -10,7 +10,7 @@
  * 状态只有一个写入口：src/ops.js 的 applyOps（白名单字段校验），工具与面板都走它。
  */
 import { readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { defineTianshuPlugin } from './tpi.js'
@@ -375,8 +375,10 @@ export default defineTianshuPlugin({
         const id = resolveId(current.items, args.id)
         const item = current.items.find(row => row.id === id)
         if (item.production?.status !== 'done') throw new Error('这条还没有成稿：先用 media_save 写正文')
-        const dir = typeof args.dir === 'string' && args.dir.trim()
-          ? join(cwd, args.dir.trim())
+        // 绝对路径要原样用：path.join 在 Windows 上不会丢弃前一段，拼出来会是 D:\D:。
+        const requested = typeof args.dir === 'string' ? args.dir.trim() : ''
+        const dir = requested
+          ? (isAbsolute(requested) ? requested : join(cwd, requested))
           : join(cwd, 'media-desk-export', slugify(item.production.title || item.title))
         const jobFile = join(dataDir, `export-${Date.now()}.json`)
         const resultFile = `${jobFile}.result.json`

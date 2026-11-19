@@ -30,12 +30,22 @@
 
 ## 打发行包
 
+天枢插件库收的是 **ZIP**，包内必须带 `xiaosi.release.json`：
+
 ```bash
-cd media-desk
-npm pack                     # 产出 tianshu-media-desk-0.1.0.tgz
+node scripts/pack-release.mjs    # 生成 dist/：运行期文件 + xiaosi.release.json
+python scripts/make-zip.py       # 产出 tianshu-media-desk-0.1.0.zip
 ```
 
-包内容由 `package.json` 的 `files` 决定：`index.js`、`tpi.js`、`lib/`、`src/`、`views/`、`scripts/`、`tianshu.plugin.json`、`README.md`、`LICENSE`。测试与本地运行产物不进包。
+三条来自官方校验器的硬约束：
+
+1. `dist/package.json` **不能带 `scripts` / `dependencies`**，否则 `validateFile` 直接拒绝；
+2. `permission_digest` = `sha256(permissions 的紧凑 JSON，保持 manifest 里的键顺序)`——这条是从 `tianshi-see-2.5.2` 的样例反推并命中的（样例 `605d55d1…`），不是猜的；
+3. ZIP 条目必须用 `/` 分隔。Windows 的 .NET `CreateFromDirectory` 会写成 `\`，`unzip` 会告警，所以才用 `scripts/make-zip.py`（`zipfile` 写的是规范分隔符）。
+
+`scripts/pack-release.mjs` 会额外把 `lib/export-worker.mjs` 显式带上——它是 `new URL(..., import.meta.url)` 引用的，不在 import 图里，漏了它 `media_export` 在真机上会 ENOENT。
+
+产物体积与 `artifact_sha256` 一律以打包后校验的输出为准，不在文档里硬编码（写死会形成"改文档 → 重打包 → 哈希又变"的自指循环）。
 
 ## 装到天枢
 

@@ -404,3 +404,16 @@ test('media_export：图片文件不存在时如实报缺，不假装导出完�
   const files = await readdir(join(workDir, 'out-missing'))
   assert.ok(files.some(name => name.endsWith('.md')), '正文仍要导出')
 })
+
+test('media_export：dir 给绝对路径时按它落盘，不能拼到工作区后面', async () => {
+  const created = await call('media_idea', { text: '绝对路径导出' })
+  const id = /it_[a-z0-9]+/.exec(created.content)?.[0]
+  await call('media_save', { id, kind: 'script', text: '# 绝对路径导出\n\n## 一\n正文。\n' })
+
+  const abs = join(workDir, 'abs-export')
+  const exported = await call('media_export', { id, dir: abs })
+  assert.notEqual(exported.isError, true, exported.content)
+
+  const files = await readdir(abs)
+  assert.ok(files.some(name => name.endsWith('.md')), `应落在 ${abs}，实际 ${files.join(',')}`)
+})
