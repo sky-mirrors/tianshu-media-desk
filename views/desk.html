@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>自媒体工作台</title>
+<link rel="stylesheet" href="desk.css">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>工作台</h1>
+    <p class="stat" id="stat" data-state="unknown">加载中…</p>
+  </div>
+  <form class="new" id="new">
+    <input id="new-text" type="text" autocomplete="off" placeholder="一句话灵感，回车记下">
+    <button type="submit">记下</button>
+  </form>
+  <nav id="filters" class="filters"></nav>
+</header>
+<main>
+  <ul class="cards" id="cards"></ul>
+  <p class="empty" id="empty" hidden>还没有灵感。在上面输入一句话，回车就记下；要写稿就点条目里的「让模型成稿」。</p>
+</main>
+<aside class="detail" id="detail" hidden>
+  <button class="close" id="close" aria-label="关闭">×</button>
+  <h2 id="d-title"></h2>
+  <p class="meta" id="d-meta"></p>
+  <p class="body" id="d-body"></p>
+  <div class="actions">
+    <label class="field">状态
+      <select id="d-status">
+        <option value="idea">灵感</option>
+        <option value="outline">大纲</option>
+        <option value="draft">草稿</option>
+        <option value="ready">待发布</option>
+        <option value="published">已发布</option>
+      </select>
+    </label>
+    <label class="field">排期
+      <input type="datetime-local" id="d-when">
+    </label>
+    <button id="d-save">保存</button>
+    <button id="d-write" class="primary">让模型成稿</button>
+    <button id="d-del" class="danger">删除</button>
+  </div>
+  <div class="hint" id="d-hint" hidden></div>
+</aside>
+<p class="toast" id="toast" hidden></p>
+<script src="desk.js"></script>
+</body>
+</html>

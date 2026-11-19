@@ -1,0 +1,40 @@
+{
+  "name": "tianshu-media-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TPI 2.0 port of dsh-media-desk for Tianshu: idea ledger, creation briefs, one-click drafting via the host model, and Markdown export.",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "files": [
+    "index.js",
+    "tpi.js",
+    "lib",
+    "src",
+    "views",
+    "scripts",
+    "tianshu.plugin.json",
+    "README.md",
+    "LICENSE",
+    "PUBLISH.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sky-mirrors/tianshu-media-desk.git"
+  },
+  "homepage": "https://github.com/sky-mirrors/tianshu-media-desk#readme",
+  "keywords": [
+    "tianshu",
+    "tpi",
+    "tpi2",
+    "plugin",
+    "content-creation",
+    "media-desk"
+  ]
+}

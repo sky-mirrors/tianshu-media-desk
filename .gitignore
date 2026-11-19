@@ -1,0 +1,13 @@
+# 运行时与本地验证产物
+node_modules/
+.local-data/
+.local-export/
+*.log
+
+# 发行包
+*.tgz
+dist/
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
