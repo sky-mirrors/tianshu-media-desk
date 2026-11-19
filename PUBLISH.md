@@ -30,22 +30,30 @@
 
 ## 打发行包
 
-天枢插件库收的是 **ZIP**，包内必须带 `xiaosi.release.json`：
+插件库收的是 **ZIP**，用官方 devkit 校验通过才算数。本机路径：`D:\Februus\.tmp-devkit`（`tianshu-developer-kit`）。
 
 ```bash
-node scripts/pack-release.mjs    # 生成 dist/：运行期文件 + xiaosi.release.json
-python scripts/make-zip.py       # 产出 tianshu-media-desk-0.1.0.zip
+# 1) 生成 dist/：入口 import 闭包 + URL 引用文件 + views/ + scripts/ + 精简 package.json
+node scripts/pack-release.mjs
+
+# 2) 补根元数据并打 ZIP：xiaosi.release.json + xiaosi.contents.json（逐文件 sha256）
+python scripts/make-release.py <完整 40 位 commit>
+
+# 3) 官方校验（等价于入库那套规则）
+cd D:/Februus/.tmp-devkit
+node cli.mjs validate <zip> --lane official_reviewed
 ```
 
-三条来自官方校验器的硬约束：
+当前状态：`valid: true`，`artifact_sha256 = 28c8a906…`，`manifest_sha256 = 1334a843…`，`artifact_bytes = 63310`，`compatibility: tpi 1.0 / core >=4.0.2 <5.0.0 / win32-x64`。
 
-1. `dist/package.json` **不能带 `scripts` / `dependencies`**，否则 `validateFile` 直接拒绝；
-2. `permission_digest` = `sha256(permissions 的紧凑 JSON，保持 manifest 里的键顺序)`——这条是从 `tianshi-see-2.5.2` 的样例反推并命中的（样例 `605d55d1…`），不是猜的；
-3. ZIP 条目必须用 `/` 分隔。Windows 的 .NET `CreateFromDirectory` 会写成 `\`，`unzip` 会告警，所以才用 `scripts/make-zip.py`（`zipfile` 写的是规范分隔符）。
+四条来自校验器的硬约束（踩过的）：
 
-`scripts/pack-release.mjs` 会额外把 `lib/export-worker.mjs` 显式带上——它是 `new URL(..., import.meta.url)` 引用的，不在 import 图里，漏了它 `media_export` 在真机上会 ENOENT。
+1. **`$tpi` 只接受 `"1.0"`**。插件库当前的准入 schema 是 TPI 1.0，`2.0` 会被 `expected "1.0"` 拒掉；因此 `capabilities` 也只能取 `tools|storage|account|embeddings|sidePathLLM|promptContext|transcripts|log`，`contributes.ui` 与 `permissions.workspace` 都不存在。
+2. **ZIP 根必须有 `xiaosi.contents.json`**——逐文件 sha256 清单，`{"files":{...},"schema":"xiaosi.contents/1"}`，不含它自己。缺了会报 `required ZIP root metadata is missing`。
+3. **`dist/package.json` 不能带 `scripts` / `dependencies`**，否则 `validateFile` 直接拒。
+4. **ZIP 条目必须 `/` 分隔**。Windows 的 .NET `CreateFromDirectory` 会写成 `\`。
 
-产物体积与 `artifact_sha256` 一律以打包后校验的输出为准，不在文档里硬编码（写死会形成"改文档 → 重打包 → 哈希又变"的自指循环）。
+为了在 1.0 的准入下仍保住 2.0 的能力，入口做了双宿主分支：`host.ui` 存在才返回面板（2.0），`host.shell` 存在才走沙箱 worker（2.0）；两者都没有时——也就是 1.0 宿主——面板不挂、导出直接用 `fs` 写（1.0 插件有完整 Node 权限）。`promptContext` 与 `sidePathLLM` 在 1.0 的能力枚举里，所以状态注入与一键成稿在新旧宿主都可用。
 
 ## 提交文案（插件库）
 

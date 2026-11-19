@@ -1,4 +1,4 @@
-# media-desk（天枢 TPI 2.0 插件）
+# media-desk（天枢插件：提交版 TPI 1.0，兼容 2.0 能力）
 
 > 包名 `tianshu-media-desk` · 版本 0.1.0 · MIT · 发布者 ID `b226234e-c3c8-4223-9e58-7e9fadbb5bea`
 > 移植自 [`woniuniuniu/dsh-media-desk`](https://github.com/woniuniuniu/dsh-media-desk)（MIT）。发布了什么、借鉴了什么见 PUBLISH.md。
@@ -23,7 +23,7 @@
 
 ## 天枢特色（dsh 版没有的部分）
 
-1. **工作台状态自动进上下文**——用 TPI 2.0 的 `promptContext`，把「待写 3 条、待发布 2 条（含排期）、当前风格卡」压成一个 `<media-desk>` 块写进每一轮对话。模型不用被问就知道有什么在等它。空台账不推块。
+1. **工作台状态自动进上下文**——用 `promptContext`，把「待写 3 条、待发布 2 条（含排期）、当前风格卡」压成一个 `<media-desk>` 块写进每一轮对话。模型不用被问就知道有什么在等它。空台账不推块。
 2. **零配置成稿**——`sidePathLLM` 用的是天枢里已经配好的模型，不引入第二套密钥与设置界面。
 3. **面板即入口**——面板里点「让模型成稿」直接调插件进程里的旁路模型。面板本身没有模型，它只是把活交给插件。
 4. **能力按需声明**——`capabilities` 只声明真正用到的：`tools` / `storage` / `workspace` / `shell` / `ui` / `promptContext` / `sidePathLLM`。没声明 `embeddings`（暂不需要语义检索）、`secrets`（没有密钥）、`transcripts`（不读会话原文）。
@@ -75,7 +75,7 @@ MEDIA_DESK_LLM_BASE_URL=https://api.example.com/v1 MEDIA_DESK_LLM_KEY=sk-... MED
 
 数据落在 `~/.rivet/plugin-data/media-desk/state.json`（与真机宿主 `pluginDataDir(id)` 的规则一致，`MEDIA_DESK_DATA` 可覆盖），所以工程目录永远是干净的，`cp` 到安装位也不会带上运行时数据。
 
-它用**真的** `tianshu.plugin.json` 和 `index.js`，按 TPI 2.0 的 host 形状注入最小宿主（`storage` / `workspace` / `shell` / `ui` / `promptContext`），所以工具行为与宿主内一致；数据落在 `.local-data/`（可用 `MEDIA_DESK_DATA` 覆盖），不碰天枢的 `plugin-data`。`sidePathLLM` 不注入——本机没有模型凭据时，`media_write` 会如实报错并指回 `media_brief` + 手写那条路。
+它用**真的** `tianshu.plugin.json` 和 `index.js`，按 host 形状注入最小宿主（`storage` / `workspace` / `shell` / `ui` / `promptContext`），所以工具行为与宿主内一致；数据落在 `.local-data/`（可用 `MEDIA_DESK_DATA` 覆盖），不碰天枢的 `plugin-data`。`sidePathLLM` 不注入——本机没有模型凭据时，`media_write` 会如实报错并指回 `media_brief` + 手写那条路。
 
 ## 真机入场自查
 
@@ -84,7 +84,7 @@ MEDIA_DESK_LLM_BASE_URL=https://api.example.com/v1 MEDIA_DESK_LLM_KEY=sk-... MED
 ```bash
 # 1. 宿主读得懂清单吗（走的是宿主加载时的同一个函数 readTpiManifest）
 node scripts/check-real-load.mjs
-#    期望：✔ media-desk | ok=true | $tpi=2.0 | id=media-desk | caps=[...]
+#    期望：✔ media-desk | ok=true | $tpi=1.0 | id=media-desk | caps=[...]
 
 # 2. 清单语义（版本判定 / permissions 严格校验 / 工具名长度）
 node scripts/check-manifest.mjs
@@ -99,7 +99,7 @@ node scripts/check-manifest.mjs
 
 ## 安装
 
-天枢 4.1.0 起支持 TPI 2.0 隔离插件。把本目录放进插件目录后重启会话：
+提交插件库用的是 TPI 1.0 清单（准入 schema 只收 1.0）。把本目录放进插件目录后重启会话：
 
 ```
 ~/.rivet/plugins/media-desk/

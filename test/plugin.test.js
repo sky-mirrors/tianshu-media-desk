@@ -417,3 +417,24 @@ test('media_export：dir 给绝对路径时按它落盘，不能拼到工作区�
   const files = await readdir(abs)
   assert.ok(files.some(name => name.endsWith('.md')), `应落在 ${abs}，实际 ${files.join(',')}`)
 })
+
+test('TPI 1.0 宿主（没有 ui / shell）：不挂面板，导出直接写文件', async () => {
+  const bareData = join(root, 'bare-data')
+  const bare = plugin.activate({
+    storage: { dataDir: () => bareData },
+    promptContext: { setBlock: () => {} },
+  })
+  assert.equal(bare.ui, undefined, '1.0 没有 ui 扩展点，不该返回面板')
+  assert.equal(bare.tools.length, 7)
+
+  const call = async (name, args = {}) => bare.tools.find(row => row.name === name).execute({ args, cwd: workDir })
+  const created = await call('media_idea', { text: '1.0 宿主路径' })
+  const id = /it_[a-z0-9]+/.exec(created.content)?.[0]
+  await call('media_save', { id, kind: 'script', text: '# 1.0 宿主路径\n\n## 一\n正文。\n' })
+
+  const abs = join(workDir, 'v1-export')
+  const exported = await call('media_export', { id, dir: abs })
+  assert.notEqual(exported.isError, true, exported.content)
+  const files = await readdir(abs)
+  assert.ok(files.some(name => name.endsWith('.md')), `应直接写进 ${abs}，实际 ${files.join(',')}`)
+})

@@ -21,7 +21,7 @@ import { buildContextBlock } from './lib/context.js'
 import { ARTICLE_SYSTEM, PLAN_SYSTEM, extractJson, textOf } from './lib/llm.js'
 import { itemLine, renderItem, renderList, renderReceipts } from './lib/render.js'
 import { KINDS, PLATFORMS, STATUSES, applyOps } from './src/ops.js'
-import { slugify } from './src/export.js'
+import { exportProduction, slugify } from './src/export.js'
 
 const WORKER = fileURLToPath(new URL('./lib/export-worker.mjs', import.meta.url))
 const LIST_LIMIT = 50
@@ -380,12 +380,19 @@ export default defineTianshuPlugin({
         const dir = requested
           ? (isAbsolute(requested) ? requested : join(cwd, requested))
           : join(cwd, 'media-desk-export', slugify(item.production.title || item.title))
-        const jobFile = join(dataDir, `export-${Date.now()}.json`)
-        const resultFile = `${jobFile}.result.json`
-        await writeFile(jobFile, JSON.stringify({ production: item.production, item, dir }))
-        await host.shell.run(`"${process.execPath}" "${WORKER}" --job "${jobFile}"`, { timeoutMs: 60_000 })
-        const result = JSON.parse(await readFile(resultFile, 'utf8'))
-        if (!result.ok) throw new Error(result.error)
+        // TPI 2.0 的插件跑在隔离沙箱里，写不了工作区：交给宿主进程的 worker。
+        // TPI 1.0 的插件有完整 Node 权限，直接写就行，不必绕一层。
+        let result
+        if (host.shell?.run) {
+          const jobFile = join(dataDir, `export-${Date.now()}.json`)
+          const resultFile = `${jobFile}.result.json`
+          await writeFile(jobFile, JSON.stringify({ production: item.production, item, dir }))
+          await host.shell.run(`"${process.execPath}" "${WORKER}" --job "${jobFile}"`, { timeoutMs: 60_000 })
+          result = JSON.parse(await readFile(resultFile, 'utf8'))
+          if (!result.ok) throw new Error(result.error)
+        } else {
+          result = await exportProduction(item.production, item, { dir })
+        }
         const lines = [`导出到 ${result.path}`, `图片 ${result.copied.length} 张${result.missing.length ? `，缺 ${result.missing.length} 张：${result.missing.join('、')}` : ''}`]
         await state.mutate(draft => {
           const target = draft.items.find(row => row.id === id)
@@ -403,9 +410,10 @@ export default defineTianshuPlugin({
     // 激活时先推一次，避免模型在第一次对话里不知道工作台有什么。
     void pushContext()
 
-    return {
-      tools,
-      ui: {
+    const api = { tools }
+    // TPI 1.0 没有 ui 扩展点：面板只在 2.0 宿主里挂得上。
+    if (!host.ui) return api
+    api.ui = {
         /** 面板发来的请求：{type:'state'} | {type:'ops', ops:[...]}。 */
         async onMessage(_view, message) {
           const type = message?.type
@@ -425,7 +433,7 @@ export default defineTianshuPlugin({
           if (id !== 'refresh') return
           await host.ui?.post('desk', { type: 'changed', label: '刷新' }).catch(() => {})
         },
-      },
     }
+    return api
   },
 })
