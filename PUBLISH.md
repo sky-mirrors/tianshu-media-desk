@@ -44,7 +44,16 @@ cd D:/Februus/.tmp-devkit
 node cli.mjs validate <zip> --lane official_reviewed
 ```
 
-当前状态：`valid: true`，`artifact_sha256 = 28c8a906…`，`manifest_sha256 = 1334a843…`，`artifact_bytes = 63310`，`compatibility: tpi 1.0 / core >=4.0.2 <5.0.0 / win32-x64`。
+当前状态（以最近一次 `validate` 输出为准）：
+
+```
+valid: true
+artifact_sha256 : cc64425259a7eeabd42d7031460d6d28ba9808b0fbb11f79da615d5ca3f4181e
+manifest_sha256 : 1334a843f1f64e0d6ac1e7256f442b4afafd03ed5dfcaa414361c62e8dd72123
+artifact_bytes  : 63336
+compatibility   : tpi 1.0 / core >=4.0.2 <5.0.0 / win32-x64
+source_commit   : d00a78c45feaa010b4e971c36722fc8af2fa34e9（远端可查）
+```
 
 四条来自校验器的硬约束（踩过的）：
 
