@@ -50,11 +50,11 @@ node cli.mjs validate <zip> --lane official_reviewed
 
 ```
 valid: true
-artifact_sha256 : c219e5a24543dcf23900b00a24355e472fac5fa34fe80ef4bc08b31e3bc187fa
+artifact_sha256 : 1d9a4cd67b3089b4df45945c341185b497949371bf8328ec9287d3ea0f6a7b52
 manifest_sha256 : f0abfe1cff16e127690b022ebb322567943822eefc93b1d45d69e7d73b274ae2
-artifact_bytes  : 41357
+artifact_bytes  : 41360
 compatibility   : tpi 1.0 / core >=4.0.2 <5.0.0 / win32-x64
-source_commit   : 50864fdf0a684496b705aa33daf957c62413f33a
+source_commit   : 791fbe785fe66ade22eb9648fc1f888ad9419d15
 ```
 
 四条来自校验器的硬约束（踩过的）：
