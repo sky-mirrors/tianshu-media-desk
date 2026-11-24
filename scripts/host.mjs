@@ -121,5 +121,9 @@ export async function loadPlugin(options = {}) {
   await mkdir(dataDir, { recursive: true })
   const { default: plugin } = await import(pathToFileURL(join(pluginDir, 'index.js')).href)
   const api = plugin.activate(host)
-  return { manifest, api, blocks, events, host, dataDir, workDir }
+  // 1.0 的 promptContext.setBlock 只在 preTurn 窗口能过 phase 门；真机由宿主在每轮对话
+  // 开始时调 lifecycle.turnStart。本地宿主在这里模拟同一个窗口。
+  const preTurn = async () => { await api.lifecycle?.turnStart?.() }
+  await preTurn()
+  return { manifest, api, blocks, events, host, dataDir, workDir, preTurn }
 }

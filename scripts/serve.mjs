@@ -27,7 +27,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
 }
 
-const { api, dataDir } = await loadPlugin({ quiet: true, onBlock: (block) => {
+const { api, dataDir, preTurn } = await loadPlugin({ quiet: true, onBlock: (block) => {
   console.log('\n— 上下文块（宿主里会写进每轮对话）—')
   console.log(block)
 } })
@@ -60,6 +60,7 @@ const server = createServer(async (req, res) => {
   try {
     if (url.pathname === '/rpc' && req.method === 'POST') {
       const payload = JSON.parse(await readBody(req))
+      await preTurn()
       const value = await api.ui.onMessage('desk', payload)
       return send(200, { value })
     }
