@@ -289,7 +289,8 @@ test('media_write：宿主没给模型时说清楚该走哪条路', async () => 
 })
 
 test('工作台状态写进对话上下文：块带 <media-desk> 标签，含待写与待发布', async () => {
-  assert.ok(blocks.length > 0, '写过数据后应至少推一次上下文')
+  await api.lifecycle.turnStart()
+  assert.ok(blocks.length > 0, 'turnStart 后应至少推一次上下文')
   const last = blocks[blocks.length - 1]
   assert.match(last, /^<media-desk>/)
   assert.match(last, /<\/media-desk>$/)

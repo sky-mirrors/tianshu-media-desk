@@ -3,7 +3,7 @@
   "kind": "tianshu.plugin",
   "id": "media-desk",
   "displayName": "自媒体工作台",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "一句话记灵感，然后做出脚本、标题、封面、配图和分镜。工作台状态经 promptContext 写进每轮对话，一键成稿用宿主已配置的模型，不需要另配密钥。移植自 dsh-media-desk（MIT）。",
   "entry": "index.js",
   "runtime": "agent",
@@ -20,7 +20,7 @@
       { "name": "media_write", "description": "一键成稿：用宿主已配置的模型按简报生成策划案与正文" },
       { "name": "media_export", "description": "把成稿导出成 Markdown 与图片到工作区" }
     ],
-    "lifecycle": [],
+    "lifecycle": ["turnStart"],
     "skills": []
   }
 }

@@ -1,5 +1,5 @@
 /**
- * index.js — 天枢 TPI 2.0 入口。
+ * index.js — 天枢 TPI 1.0 入口。
  *
  * 与上游 dsh-media-desk 的分工差异（为什么这么切）：
  *   上游把「一键成稿」做在插件内部——插件自己调模型写文章、调生图接口画封面。
@@ -9,9 +9,7 @@
  *
  * 状态只有一个写入口：src/ops.js 的 applyOps（白名单字段校验），工具与面板都走它。
  */
-import { readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { defineTianshuPlugin } from './tpi.js'
 import { parametersToJsonSchema } from './lib/schema.js'
@@ -23,7 +21,6 @@ import { itemLine, renderItem, renderList, renderReceipts } from './lib/render.j
 import { KINDS, PLATFORMS, STATUSES, applyOps } from './src/ops.js'
 import { exportProduction, slugify } from './src/export.js'
 
-const WORKER = fileURLToPath(new URL('./lib/export-worker.mjs', import.meta.url))
 const LIST_LIMIT = 50
 
 /** id 允许写前缀：agent 从列表里复制半截也能用，只要唯一。 */
@@ -118,6 +115,7 @@ const saveTool = () => ({
 const exportTool = () => ({
   name: 'media_export',
   description: '把成稿导出到工作区：一份 Markdown（正文、图注、分镜表）+ assets/ 里的图片。',
+  pathParams: { dir: 'write' },
   parameters: {
     id: { type: 'string', required: true, description: '条目 id' },
     dir: { type: 'string', description: '导出目录（工作区相对路径）；默认 media-desk-export/<标题>' },
@@ -190,7 +188,7 @@ export default defineTianshuPlugin({
       const result = await state.mutate(draft => applyOps(draft, Array.isArray(ops) ? ops : []))
       void host.ui?.post('desk', { type: 'changed', label }).catch(() => {})
       if (result.errors.length && !result.receipts.length) throw new Error(result.errors.join('；'))
-      await pushContext()
+      // promptContext.setBlock 只在 turnStart 钩子里过宿主 phase 门，工具调用期间推无效。
       return result
     }
 
@@ -233,11 +231,13 @@ export default defineTianshuPlugin({
     }
 
     const tools = SPECS.map((spec) => {
-      const { name, description, parameters } = spec()
+      const { name, description, parameters, pathParams } = spec()
       return {
         name,
         description,
         inputSchema: parametersToJsonSchema(parameters),
+        // 宿主 wrapTpiTool 按这个声明做 validatePathSafe：越界/敏感路径在边界直接拒绝。
+        ...(pathParams ? { pathParams } : {}),
         timeoutMs: name === 'media_export' ? 60_000 : 20_000,
         async execute({ args = {}, cwd }) {
           try {
@@ -375,24 +375,14 @@ export default defineTianshuPlugin({
         const id = resolveId(current.items, args.id)
         const item = current.items.find(row => row.id === id)
         if (item.production?.status !== 'done') throw new Error('这条还没有成稿：先用 media_save 写正文')
-        // 绝对路径要原样用：path.join 在 Windows 上不会丢弃前一段，拼出来会是 D:\D:。
+        // 对外边界由宿主 pathParams 守（绝对路径越界直接拒绝）；插件内部仍做相对路径
+        // 解析，测试与本地宿主绕过宿主 wrapper 直调 execute 时行为不变。
         const requested = typeof args.dir === 'string' ? args.dir.trim() : ''
         const dir = requested
           ? (isAbsolute(requested) ? requested : join(cwd, requested))
           : join(cwd, 'media-desk-export', slugify(item.production.title || item.title))
-        // TPI 2.0 的插件跑在隔离沙箱里，写不了工作区：交给宿主进程的 worker。
-        // TPI 1.0 的插件有完整 Node 权限，直接写就行，不必绕一层。
-        let result
-        if (host.shell?.run) {
-          const jobFile = join(dataDir, `export-${Date.now()}.json`)
-          const resultFile = `${jobFile}.result.json`
-          await writeFile(jobFile, JSON.stringify({ production: item.production, item, dir }))
-          await host.shell.run(`"${process.execPath}" "${WORKER}" --job "${jobFile}"`, { timeoutMs: 60_000 })
-          result = JSON.parse(await readFile(resultFile, 'utf8'))
-          if (!result.ok) throw new Error(result.error)
-        } else {
-          result = await exportProduction(item.production, item, { dir })
-        }
+        // TPI 1.0 的插件有完整 Node 权限，直接写工作区。
+        const result = await exportProduction(item.production, item, { dir })
         const lines = [`导出到 ${result.path}`, `图片 ${result.copied.length} 张${result.missing.length ? `，缺 ${result.missing.length} 张：${result.missing.join('、')}` : ''}`]
         await state.mutate(draft => {
           const target = draft.items.find(row => row.id === id)
@@ -407,10 +397,12 @@ export default defineTianshuPlugin({
       throw new Error(`未知工具：${name}`)
     }
 
-    // 激活时先推一次，避免模型在第一次对话里不知道工作台有什么。
-    void pushContext()
-
-    const api = { tools }
+    const api = {
+      tools,
+      // TPI 1.0：宿主把 turnStart 钩子注册成 preTurn 阶段的 RuntimeHook，
+      // 只有这个窗口里 promptContext.setBlock 能通过 phase 门。
+      lifecycle: { async turnStart() { await pushContext() } },
+    }
     // TPI 1.0 没有 ui 扩展点：面板只在 2.0 宿主里挂得上。
     if (!host.ui) return api
     api.ui = {

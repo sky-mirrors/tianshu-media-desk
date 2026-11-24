@@ -4,10 +4,10 @@
 |---|---|
 | 插件 id | `media-desk` |
 | 包名 | `tianshu-media-desk` |
-| 版本 | 0.1.0 |
+| 版本 | 0.1.1 |
 | 发布者 ID | `b226234e-c3c8-4223-9e58-7e9fadbb5bea` |
 | 许可证 | MIT |
-| 目标 TPI | 2.0（`engines.tianshu >=4.1.0`） |
+| 目标 TPI | 1.0（`$tpi: "1.0"`，`engines.tianshu >=4.0.2 <5.0.0`） |
 
 ## 借鉴了什么
 
@@ -24,6 +24,8 @@
 
 - `index.js`、`lib/brief.js`、`lib/context.js`、`lib/llm.js`、`lib/render.js`、`lib/state.js`、`lib/export-worker.mjs`、`src/export.js`、`views/**`、`scripts/**`、`test/**`。
 
+发行包只纳入入口 import 闭包 + 四份根文件（共 18 个文件）；`views/`、`scripts/`、`test/`、`lib/export-worker.mjs` 留在仓库，不进包。
+
 未移植：
 
 - `monid.js`（第三方账号抓取，需要付费服务）、`images.js` / `image-tool.js`（插件内生图，天枢里交给生图工具）、`seed.js` 的示例数据、`learn.js` 的规则自动提炼（改由模型写）。
@@ -33,7 +35,7 @@
 插件库收的是 **ZIP**，用官方 devkit 校验通过才算数。本机路径：`D:\Februus\.tmp-devkit`（`tianshu-developer-kit`）。
 
 ```bash
-# 1) 生成 dist/：入口 import 闭包 + URL 引用文件 + views/ + scripts/ + 精简 package.json
+# 1) 生成 dist/：入口 import 闭包 + 根清单与文档 + 精简 package.json
 node scripts/pack-release.mjs
 
 # 2) 补根元数据并打 ZIP：xiaosi.release.json + xiaosi.contents.json（逐文件 sha256）
@@ -48,11 +50,11 @@ node cli.mjs validate <zip> --lane official_reviewed
 
 ```
 valid: true
-artifact_sha256 : 194cd41dab01ccc115b0be6a6dff409e28bf8349a4efbb7eb734911aedbeeca1
-manifest_sha256 : 1334a843f1f64e0d6ac1e7256f442b4afafd03ed5dfcaa414361c62e8dd72123
-artifact_bytes  : 64186
+artifact_sha256 : c219e5a24543dcf23900b00a24355e472fac5fa34fe80ef4bc08b31e3bc187fa
+manifest_sha256 : f0abfe1cff16e127690b022ebb322567943822eefc93b1d45d69e7d73b274ae2
+artifact_bytes  : 41357
 compatibility   : tpi 1.0 / core >=4.0.2 <5.0.0 / win32-x64
-source_commit   : cd6f8afbc45e581a338f418eb3c6f1ed67f76322
+source_commit   : 50864fdf0a684496b705aa33daf957c62413f33a
 ```
 
 四条来自校验器的硬约束（踩过的）：
@@ -62,7 +64,7 @@ source_commit   : cd6f8afbc45e581a338f418eb3c6f1ed67f76322
 3. **`dist/package.json` 不能带 `scripts` / `dependencies`**，否则 `validateFile` 直接拒。
 4. **ZIP 条目必须 `/` 分隔**。Windows 的 .NET `CreateFromDirectory` 会写成 `\`。
 
-为了在 1.0 的准入下仍保住 2.0 的能力，入口做了双宿主分支：`host.ui` 存在才返回面板（2.0），`host.shell` 存在才走沙箱 worker（2.0）；两者都没有时——也就是 1.0 宿主——面板不挂、导出直接用 `fs` 写（1.0 插件有完整 Node 权限）。`promptContext` 与 `sidePathLLM` 在 1.0 的能力枚举里，所以状态注入与一键成稿在新旧宿主都可用。
+0.1.1 起不再做双宿主分支，只按 1.0 宿主实现：导出直接用 `fs` 写（1.0 插件有完整 Node 权限），不再走 `shell.run` 沙箱 worker；面板只在本地宿主（`scripts/serve.mjs`）里挂。状态注入改由 `lifecycle: ["turnStart"]` 钩子触发——`promptContext.setBlock` 只在 preTurn 窗口能过宿主的 phase 门，工具调用期间推无效。`media_export` 的 `dir` 用工具上声明的 `pathParams: { dir: 'write' }` 交给宿主 `wrapTpiTool` 做越界校验。
 
 ## 提交文案（插件库）
 
@@ -84,6 +86,13 @@ source_commit   : cd6f8afbc45e581a338f418eb3c6f1ed67f76322
 - **本地运行版**（`scripts/serve.mjs`，不经宿主）：只有你自己设置 `MEDIA_DESK_LLM_BASE_URL` / `MEDIA_DESK_LLM_KEY` / `MEDIA_DESK_LLM_MODEL` 三个环境变量后才会访问你指定的那个端点；不设就完全不联网。它起的是绑定 `127.0.0.1` 的本地页面服务。
 - **第三方依赖**：零。`package.json` 没有 `dependencies` 也没有 `devDependencies`，插件主体（`index.js` / `lib/` / `src/`）里没有任何 `fetch` 或 HTTP 调用。
 - **不接触的端点**：无更新检查、无遥测上报、无许可校验服务器、无第三方统计。
+
+### 版本变更说明（v0.1.1）
+
+- 入口收敛到 TPI 1.0 单宿主：`media_export` 删掉 `host.shell` 沙箱 worker 分支，直接用 `fs` 写工作区。
+- 状态上下文改由 `turnStart` 生命周期钩子推送（此前在激活时推一次，会被宿主的 phase 门拦掉）。
+- `media_export` 增加 `pathParams: { dir: 'write' }`，越界路径由宿主在边界拒绝。
+- 发行包收敛到运行所需：18 个文件，不含 `views/**`、`scripts/**`、`lib/export-worker.mjs`。
 
 ### 版本变更说明（v0.1.0）
 

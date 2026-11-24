@@ -1,8 +1,8 @@
 {
   "name": "tianshu-media-desk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "TPI 2.0 port of dsh-media-desk for Tianshu: idea ledger, creation briefs, one-click drafting via the host model, and Markdown export.",
+  "description": "TPI 1.0 plugin for Tianshu: idea ledger, creation briefs, one-click drafting via the host model, and Markdown export.",
   "type": "module",
   "main": "index.js",
   "license": "MIT",
@@ -32,7 +32,6 @@
   "keywords": [
     "tianshu",
     "tpi",
-    "tpi2",
     "plugin",
     "content-creation",
     "media-desk"

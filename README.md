@@ -1,6 +1,6 @@
 # media-desk
 
-> `tianshu-media-desk` · 0.1.0 · MIT · 发布者 ID `b226234e-c3c8-4223-9e58-7e9fadbb5bea`
+> `tianshu-media-desk` · 0.1.1 · MIT · 发布者 ID `b226234e-c3c8-4223-9e58-7e9fadbb5bea`
 > 天枢 TPI 插件。移植自 [`woniuniuniu/dsh-media-desk`](https://github.com/woniuniuniu/dsh-media-desk)（MIT）——复用了什么、改了什么见 PUBLISH.md。
 
 一句话记灵感，然后做出脚本、标题、封面、配图和黑白线稿分镜。
@@ -41,7 +41,7 @@ node scripts/serve.mjs
 
 不设这三个变量时 `media_write` 会明确报错并指回 `media_brief` + 手写那条路——它不假装自己有模型。
 
-它用的是**真的** `tianshu.plugin.json` 和 `index.js`，按宿主形状注入 `storage` / `workspace` / `shell` / `ui` / `promptContext`，所以工具行为与宿主内一致。数据落在 `~/.rivet/plugin-data/media-desk/state.json`（同真机 `pluginDataDir(id)` 的规则，`MEDIA_DESK_DATA` 可覆盖），工程目录因此永远干净。
+它用的是**真的** `tianshu.plugin.json` 和 `index.js`，按宿主形状注入 `storage` / `workspace` / `shell` / `ui` / `promptContext`（这是 2.0 形状的本地宿主，面板靠它才挂得上），所以工具行为与宿主内一致。数据落在 `~/.rivet/plugin-data/media-desk/state.json`（同真机 `pluginDataDir(id)` 的规则，`MEDIA_DESK_DATA` 可覆盖），工程目录因此永远干净。
 
 ## 七个工具
 
@@ -60,33 +60,38 @@ node scripts/serve.mjs
 1. **工作台状态自动进上下文**——用 `promptContext` 把「待写 N 条、待发布（含排期）、当前风格卡」压成一个 `<media-desk>` 块写进每轮对话。模型不用被问就知道有什么在等它；空台账不推块。
 2. **零配置成稿**——`sidePathLLM` 用的是天枢里已经配好的模型，不引入第二套密钥与设置界面。
 3. **能力按需声明**——清单只声明真正用到的四项：`tools` / `storage` / `promptContext` / `sidePathLLM`。没声明 `embeddings`（不做语义检索）、`account`（不要账号）、`transcripts`（不读会话原文）。
-4. **两种宿主都能跑**——见下节。
+4. **单清单装进 1.0 宿主**——清单按插件库准入的 1.0 形状写：`capabilities` 只取 `tools` / `storage` / `promptContext` / `sidePathLLM` 四项，`permissions` 只有 `fs` / `net` / `shell` 三个开关，没有 `contributes.ui`。
 
 ## 装进天枢
 
 提交插件库用的是 **TPI 1.0** 清单（准入 schema 只收 `"1.0"` 的能力与 `permissions` 形状）：`capabilities: [tools, storage, promptContext, sidePathLLM]`、`permissions: {fs, net, shell}`。
 
-两个 TPI 版本的差别在这一版里被抹平了：
+发行包只装 1.0 宿主跑得起来的东西：
 
-| | TPI 2.0 宿主 | TPI 1.0 宿主 |
-|---|---|---|
-| 面板（`contributes.ui`） | 挂得上 | 1.0 没有 ui 扩展点，不挂 |
-| 导出 | 插件在沙箱里写不了工作区，走 `shell.run` 跑 `lib/export-worker.mjs` | 插件有完整 Node 权限，直接用 `fs` 写 |
-| `promptContext` / `sidePathLLM` | 有 | 有（1.0 能力枚举里也有） |
+| 事 | 这一版怎么做 |
+|---|---|
+| 面板（`contributes.ui`） | 1.0 没有 ui 扩展点，发行包里没有 `views/`；面板只在本地宿主里跑 |
+| 导出 | 插件有完整 Node 权限，`src/export.js` 直接用 `fs` 写；沙箱 `shell.run` + `lib/export-worker.mjs` 那条分支已删 |
+| `promptContext` | 经 `lifecycle: ["turnStart"]` 钩子推上下文块——`setBlock` 只在 turnStart 窗口里通过宿主的 phase 门 |
+| `sidePathLLM` | 1.0 能力枚举里有，一键成稿照常可用 |
 
-入口按 `host.ui` / `host.shell` 是否存在自动分支，所以同一份代码在两种宿主下行为一致，只是 1.0 下没有面板。
+工具参数里的路径靠 `pathParams: { dir: 'write' }` 交给宿主 `wrapTpiTool` 做越界校验，插件内部不再重复守一遍。
 
 ```
 ~/.rivet/plugins/media-desk/
   ├── tianshu.plugin.json   清单（$tpi 1.0 / capabilities / permissions）
-  ├── index.js              入口：注册工具（2.0 下额外挂面板）
+  ├── index.js              入口：注册工具、turnStart 钩子
   ├── tpi.js                SDK 握手（只在宿主内可用）
-  ├── lib/                  参数表编译、存储、简报、上下文块、渲染、导出 worker
-  ├── src/                  移植自上游的纯函数数据层
-  └── views/                面板（HTML + CSS + 原生 JS）
+  ├── lib/                  参数表编译、存储、简报、上下文块、渲染
+  ├── src/                  移植自上游的纯函数数据层 + 导出
+  └── views/                面板（HTML + CSS + 原生 JS，仅本地宿主加载，不进发行包）
 ```
 
 数据落在 `~/.rivet/plugin-data/media-desk/state.json`：`items`（灵感与成稿）、`styles`、`skills`（写作规则）、`metrics`、`people`、`angles`、`accounts`、`activeStyleId`、`draftFormat`。首次读取自动建空台账。
+
+- **会不会发往模型**：台账不主动外发；每轮对话会推一份摘要上下文块（待写/排期/风格卡，只有标题与 id，不含正文）。正文只在成稿时按你调用的工具（`media_write`）发给宿主已配置的模型。插件自身不联网（`permissions.net: false`）。
+- **保留多久**：无自动清理、无过期；`state.json` 一直在，直到你删。
+- **怎么删**：直接删 `~/.rivet/plugin-data/media-desk/` 整个目录即全量清除；单条用 `media_item` 的 `delete` 动作。卸载插件不会自动删数据。
 
 ## 开发与自检
 
@@ -116,12 +121,12 @@ cd D:/Februus/.tmp-devkit && node cli.mjs validate <zip> --lane official_reviewe
 
 重写：
 
-- `index.js` — 双宿主入口、七个工具、面板消息处理。
+- `index.js` — 1.0 入口、七个工具、turnStart 钩子与面板消息处理。
 - `lib/state.js` — 上游 `store.js` 的去 DSH 依赖版：`dataDir` 换掉 `$DSH_HOME`，去掉三方合并撤销；补了跨进程 `mtime` 重读（界面与命令行是两个进程共用一份 `state.json`）。
 - `lib/brief.js` — 上游 `ai.js` 里 `planPrompts` / `articlePrompts` 的规范，从「发给模型的系统提示词」改成「给模型的简报回执」；`phase:'article'` 是正文专用版。
 - `lib/llm.js` — `extractJson` 移植自上游；`sidePathLLM.complete` 的返回结构宿主侧没取到明文，所以 `textOf` 接受几种常见形状，都不是就报错。
 - `lib/context.js` — 新增，`<media-desk>` 上下文块的渲染。
-- `src/export.js`、`lib/export-worker.mjs` — 上游把保存逻辑写死在对话框尾部，这里拆成可测试的纯函数 + worker。
+- `src/export.js` — 上游把保存逻辑写死在对话框尾部，这里拆成可测试的纯函数。`lib/export-worker.mjs` 是 2.0 沙箱分支的遗物，留在仓库但不被引用、不进发行包。
 - `views/` — 上游是 React + `@deepseek-ai/dsh-client-runtime`，iframe 里跑不了，改用原生 HTML/JS 按 TPI 的 view 协议重写。
 
 没有移植：`monid.js`（第三方账号抓取，需付费服务）、`images.js` / `image-tool.js`（插件内生图，天枢里交给生图工具）、`seed.js` 的示例数据（空台账起步）、`learn.js` 的规则自动提炼（改由模型用 `media_save kind:"rule"` 写）。
