@@ -7,7 +7,7 @@
 | 版本 | 0.1.1 |
 | 发布者 ID | `b226234e-c3c8-4223-9e58-7e9fadbb5bea` |
 | 许可证 | MIT |
-| 目标 TPI | 1.0（`$tpi: "1.0"`，`engines.tianshu >=4.0.2 <5.0.0`） |
+| 目标 TPI | 2.0（`$tpi: "2.0"`，`engines.tianshu >=4.1.0`） |
 
 ## 借鉴了什么
 
@@ -24,7 +24,7 @@
 
 - `index.js`、`lib/brief.js`、`lib/context.js`、`lib/llm.js`、`lib/render.js`、`lib/state.js`、`lib/export-worker.mjs`、`src/export.js`、`views/**`、`scripts/**`、`test/**`。
 
-发行包只纳入入口 import 闭包 + 四份根文件（共 18 个文件）；`views/`、`scripts/`、`test/`、`lib/export-worker.mjs` 留在仓库，不进包。
+发行包纳入入口 import 闭包 + `views/` + `lib/export-worker.mjs` + 根文件（共 22 个文件）；`scripts/`、`test/` 留在仓库，不进包。
 
 未移植：
 
@@ -46,16 +46,23 @@ cd D:/Februus/.tmp-devkit
 node cli.mjs validate <zip> --lane official_reviewed
 ```
 
-当前状态（以最近一次 `validate` 输出为准）：
+当前状态（以最近一次实测为准，TPI 2.0 清单进不了官方 lane）：
 
 ```
-valid: true
-artifact_sha256 : 15ed4e65b6ce0c7b57dab7e7e635b6113e71fcd518013b5e67ceb6165a470231
-manifest_sha256 : f0abfe1cff16e127690b022ebb322567943822eefc93b1d45d69e7d73b274ae2
-artifact_bytes  : 41357
-compatibility   : tpi 1.0 / core >=4.0.2 <5.0.0 / win32-x64
-source_commit   : 791fbe785fe66ade22eb9648fc1f888ad9419d15
+# 官方 lane：预期拒绝，首条就是版本闸
+$ node cli.mjs validate tianshu-media-desk-0.1.1.zip --lane official_reviewed
+[{"code":"invalid_value","values":["1.0"],"path":["$tpi"],"message":"Invalid input: expected \"1.0\""}, ...]
+
+# 本机宿主自己的校验器（这份 2.0 包的服务对象）
+readTpiManifest(dist) -> ok，$tpi=2.0，capabilities 7 项
+
+artifact_sha256 : 0e337644cb1ba476d10c6590710435ab3acdf3b836ee7ddc2b09cbff76152d56
+artifact_bytes  : 49179
+compatibility   : tpi 2.0 / core >=4.1.0 / win32-x64
+source_commit   : 13b19fc9eb11d4bce021b605d53c9a41a73e050e
 ```
+
+回溯：0.1.0 时期那份 `$tpi: "1.0"` 的包曾通过官方 lane（`artifact_sha256 194cd41d…`，64186 字节）。切到 2.0 后这条通道就关上了，两者不可兼得。
 
 四条来自校验器的硬约束（踩过的）：
 
@@ -64,7 +71,7 @@ source_commit   : 791fbe785fe66ade22eb9648fc1f888ad9419d15
 3. **`dist/package.json` 不能带 `scripts` / `dependencies`**，否则 `validateFile` 直接拒。
 4. **ZIP 条目必须 `/` 分隔**。Windows 的 .NET `CreateFromDirectory` 会写成 `\`。
 
-0.1.1 起不再做双宿主分支，只按 1.0 宿主实现：导出直接用 `fs` 写（1.0 插件有完整 Node 权限），不再走 `shell.run` 沙箱 worker；面板只在本地宿主（`scripts/serve.mjs`）里挂。状态注入改由 `lifecycle: ["turnStart"]` 钩子触发——`promptContext.setBlock` 只在 preTurn 窗口能过宿主的 phase 门，工具调用期间推无效。`media_export` 的 `dir` 用工具上声明的 `pathParams: { dir: 'write' }` 交给宿主 `wrapTpiTool` 做越界校验。
+清单按 TPI 2.0 写：插件跑在隔离沙箱、没有 Node 权限，所以 `media_export` 走 `host.shell.run` 起 `lib/export-worker.mjs`，在宿主进程里写盘（宿主没给 `shell` 时才由插件自己写）。面板经 `contributes.ui` 挂 `views/desk.html`。状态注入由 `lifecycle: ["turnStart"]` 钩子触发——`promptContext.setBlock` 只在 preTurn 窗口能过宿主的 phase 门，工具调用期间推无效。`media_export` 的 `dir` 声明 `pathParams: { dir: 'write' }`，宿主 `wrapTpiTool` 在边界做 `validatePathSafe`。
 
 ## 提交文案（插件库）
 
@@ -89,10 +96,12 @@ source_commit   : 791fbe785fe66ade22eb9648fc1f888ad9419d15
 
 ### 版本变更说明（v0.1.1）
 
-- 入口收敛到 TPI 1.0 单宿主：`media_export` 删掉 `host.shell` 沙箱 worker 分支，直接用 `fs` 写工作区。
-- 状态上下文改由 `turnStart` 生命周期钩子推送（此前在激活时推一次，会被宿主的 phase 门拦掉）。
+- 清单切到 **TPI 2.0**：`capabilities` 加 `workspace` / `shell` / `ui`，`permissions` 换成对象形状，`engines.tianshu >=4.1.0`，并挂上面板（`contributes.ui`）。
+- `media_export` 恢复沙箱路径：`host.shell.run` 起 `lib/export-worker.mjs` 在宿主进程写盘；宿主没给 `shell`（本地宿主/测试直调）时插件自己写。
+- 状态上下文改由 `turnStart` 生命周期钩子推送（激活时推会被宿主的 phase 门拦掉）。
 - `media_export` 增加 `pathParams: { dir: 'write' }`，越界路径由宿主在边界拒绝。
-- 发行包收敛到运行所需：18 个文件，不含 `views/**`、`scripts/**`、`lib/export-worker.mjs`。
+- 发行包 22 个文件，含 `views/` 与 `lib/export-worker.mjs`。
+- 限制：TPI 2.0 清单过不了插件库准入（官方 lane 只收 `$tpi: "1.0"`），这份包只用于本机安装。
 
 ### 版本变更说明（v0.1.0）
 

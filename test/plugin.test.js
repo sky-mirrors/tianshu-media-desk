@@ -18,8 +18,12 @@ const blocks = []
 const llmCalls = []
 let llmQueue = []
 
+// 宿主怎么解析 shell.run 的命令串是宿主的职责，测试只验证插件产出的命令能不能被切成 argv 执行；
+// 这样不依赖本机是否装了 bash / cmd 的引号规则。
 const shellRun = (command, options) => new Promise((resolve, reject) => {
-  execFile('bash', ['-c', command], { timeout: options?.timeoutMs ?? 30_000 }, (err, stdout, stderr) => {
+  const argv = command.match(/"[^"]*"|\S+/g).map(token => token.replace(/^"|"$/g, ''))
+  const [bin, ...rest] = argv
+  execFile(bin, rest, { timeout: options?.timeoutMs ?? 30_000 }, (err, stdout, stderr) => {
     if (err) reject(Object.assign(err, { stdout, stderr }))
     else resolve({ stdout, stderr })
   })

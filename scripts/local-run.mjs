@@ -34,7 +34,7 @@ if (command === 'tools') {
   }
   console.log(result.content)
 } else if (command === 'demo') {
-  const { api, blocks, workDir, dataDir } = await loadPlugin({ quiet: true })
+  const { api, blocks, workDir, dataDir, preTurn } = await loadPlugin({ quiet: true })
   const call = async (name, args = {}) => {
     const result = await api.tools.find(row => row.name === name).execute({ args, cwd: workDir })
     console.log(`\n${result.isError ? '✘' : '✔'} ${name} ${args.id ?? ''}`)
@@ -62,6 +62,8 @@ if (command === 'tools') {
   // 导出到数据目录下，工程目录保持干净
   await call('media_export', { id, dir: join(dataDir, 'export') })
 
+  // 下一轮开始：真机由宿主在 preTurn 调 turnStart，块才推得出去
+  await preTurn()
   console.log('\n— 上下文块（本应写进每轮对话）—')
   console.log(blocks.at(-1) ?? '（空台账或本机未启用 promptContext）')
 } else {

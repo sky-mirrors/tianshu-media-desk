@@ -1,5 +1,5 @@
 /**
- * index.js — 天枢 TPI 1.0 入口。
+ * index.js — 天枢 TPI 2.0 入口。
  *
  * 与上游 dsh-media-desk 的分工差异（为什么这么切）：
  *   上游把「一键成稿」做在插件内部——插件自己调模型写文章、调生图接口画封面。
@@ -9,7 +9,9 @@
  *
  * 状态只有一个写入口：src/ops.js 的 applyOps（白名单字段校验），工具与面板都走它。
  */
+import { readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { defineTianshuPlugin } from './tpi.js'
 import { parametersToJsonSchema } from './lib/schema.js'
@@ -21,6 +23,7 @@ import { itemLine, renderItem, renderList, renderReceipts } from './lib/render.j
 import { KINDS, PLATFORMS, STATUSES, applyOps } from './src/ops.js'
 import { exportProduction, slugify } from './src/export.js'
 
+const WORKER = fileURLToPath(new URL('./lib/export-worker.mjs', import.meta.url))
 const LIST_LIMIT = 50
 
 /** id 允许写前缀：agent 从列表里复制半截也能用，只要唯一。 */
@@ -381,8 +384,19 @@ export default defineTianshuPlugin({
         const dir = requested
           ? (isAbsolute(requested) ? requested : join(cwd, requested))
           : join(cwd, 'media-desk-export', slugify(item.production.title || item.title))
-        // TPI 1.0 的插件有完整 Node 权限，直接写工作区。
-        const result = await exportProduction(item.production, item, { dir })
+        // TPI 2.0 的插件跑在隔离沙箱里，写不了工作区：交给宿主进程的 worker。
+        // 宿主没给 shell（本地宿主、测试直调 execute）时，插件自己就在 Node 里，直接写。
+        let result
+        if (host.shell?.run) {
+          const jobFile = join(dataDir, `export-${Date.now()}.json`)
+          const resultFile = `${jobFile}.result.json`
+          await writeFile(jobFile, JSON.stringify({ production: item.production, item, dir }))
+          await host.shell.run(`"${process.execPath}" "${WORKER}" --job "${jobFile}"`, { timeoutMs: 60_000 })
+          result = JSON.parse(await readFile(resultFile, 'utf8'))
+          if (!result.ok) throw new Error(result.error)
+        } else {
+          result = await exportProduction(item.production, item, { dir })
+        }
         const lines = [`导出到 ${result.path}`, `图片 ${result.copied.length} 张${result.missing.length ? `，缺 ${result.missing.length} 张：${result.missing.join('、')}` : ''}`]
         await state.mutate(draft => {
           const target = draft.items.find(row => row.id === id)
@@ -399,8 +413,8 @@ export default defineTianshuPlugin({
 
     const api = {
       tools,
-      // TPI 1.0：宿主把 turnStart 钩子注册成 preTurn 阶段的 RuntimeHook，
-      // 只有这个窗口里 promptContext.setBlock 能通过 phase 门。
+      // 宿主把 turnStart 钩子注册成 preTurn 阶段的 RuntimeHook；promptContext.setBlock
+      // 只在这个窗口能过 phase 门，工具调用期间推无效。
       lifecycle: { async turnStart() { await pushContext() } },
     }
     // TPI 1.0 没有 ui 扩展点：面板只在 2.0 宿主里挂得上。

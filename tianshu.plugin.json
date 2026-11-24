@@ -1,5 +1,5 @@
 {
-  "$tpi": "1.0",
+  "$tpi": "2.0",
   "kind": "tianshu.plugin",
   "id": "media-desk",
   "displayName": "自媒体工作台",
@@ -7,9 +7,17 @@
   "description": "一句话记灵感，然后做出脚本、标题、封面、配图和分镜。工作台状态经 promptContext 写进每轮对话，一键成稿用宿主已配置的模型，不需要另配密钥。移植自 dsh-media-desk（MIT）。",
   "entry": "index.js",
   "runtime": "agent",
-  "engines": { "tianshu": ">=4.0.2 <5.0.0" },
-  "capabilities": ["tools", "storage", "promptContext", "sidePathLLM"],
-  "permissions": { "fs": true, "net": false, "shell": false },
+  "engines": { "tianshu": ">=4.1.0" },
+  "capabilities": ["tools", "storage", "workspace", "shell", "ui", "promptContext", "sidePathLLM"],
+  "permissions": {
+    "workspace": {
+      "read": true,
+      "write": true
+    },
+    "shell": {
+      "run": true
+    }
+  },
   "contributes": {
     "tools": [
       { "name": "media_idea", "description": "把一句话灵感、链接或图片记进工作台" },
@@ -20,6 +28,33 @@
       { "name": "media_write", "description": "一键成稿：用宿主已配置的模型按简报生成策划案与正文" },
       { "name": "media_export", "description": "把成稿导出成 Markdown 与图片到工作区" }
     ],
+    "ui": {
+      "views": [
+        {
+          "id": "desk",
+          "title": "自媒体工作台",
+          "entry": "views/desk.html"
+        }
+      ],
+      "panels": [
+        {
+          "view": "desk",
+          "label": "工作台"
+        }
+      ],
+      "commands": [
+        {
+          "id": "refresh",
+          "title": "刷新工作台"
+        }
+      ],
+      "statusItems": [
+        {
+          "id": "job",
+          "view": "desk"
+        }
+      ]
+    },
     "lifecycle": ["turnStart"],
     "skills": []
   }

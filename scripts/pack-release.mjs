@@ -14,11 +14,11 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(ROOT, 'dist')
 const ENTRY = 'index.js'
-// TPI 1.0 下宿主没有 ui 扩展点，views/ 永不加载；export-worker 只在 2.0 的
-// host.shell.run 分支用到（已随死分支一并移除）。两者都留在仓库，不进发行包。
-const STATIC_DIRS = []
-// 当前没有需要显式列出的 URL 引用文件：沙箱 worker 分支已删。
-const URL_ASSETS = []
+// 面板是宿主按路径加载的静态文件，不在 import 图里
+const STATIC_DIRS = ['views']
+// 用 new URL('...', import.meta.url) 交给 shell.run 跑的文件：也读不出来，必须显式列出。
+// 漏了它 media_export 会在真机上 ENOENT。
+const URL_ASSETS = ['lib/export-worker.mjs']
 // 开发脚本不进发行包（规范要求只纳入运行所需）。
 const EXTRA_DIRS = []
 
