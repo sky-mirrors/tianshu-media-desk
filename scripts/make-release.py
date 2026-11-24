@@ -68,9 +68,14 @@ with open(os.path.join(DIST, 'xiaosi.contents.json'), 'w', encoding='utf-8') as 
     json.dump(contents, handle, separators=(',', ':'))
 
 # 3) 打 ZIP（条目用 / 分隔）
+# 时间戳固定成 1980-01-01：否则同一份内容每次打包的 artifact_sha256 都不同，
+# PUBLISH.md 记的校验值就没法作为「这个包就是它」的凭据。
 with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED) as archive:
     for full, arc in walk_files():
-        archive.write(full, arc)
+        info = zipfile.ZipInfo(arc, date_time=(1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = 0o644 << 16
+        archive.writestr(info, open(full, 'rb').read())
 
 print(f'zip: {OUT}')
 print(f'  {os.path.getsize(OUT)} bytes | {len(zipfile.ZipFile(OUT).namelist())} entries')

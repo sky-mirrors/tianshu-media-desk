@@ -50,9 +50,9 @@ node cli.mjs validate <zip> --lane official_reviewed
 
 ```
 valid: true
-artifact_sha256 : 1d9a4cd67b3089b4df45945c341185b497949371bf8328ec9287d3ea0f6a7b52
+artifact_sha256 : 15ed4e65b6ce0c7b57dab7e7e635b6113e71fcd518013b5e67ceb6165a470231
 manifest_sha256 : f0abfe1cff16e127690b022ebb322567943822eefc93b1d45d69e7d73b274ae2
-artifact_bytes  : 41360
+artifact_bytes  : 41357
 compatibility   : tpi 1.0 / core >=4.0.2 <5.0.0 / win32-x64
 source_commit   : 791fbe785fe66ade22eb9648fc1f888ad9419d15
 ```
