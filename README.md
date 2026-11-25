@@ -1,6 +1,6 @@
 # media-desk · 自媒体工作台
 
-> `tianshu-media-desk` · 0.1.1 · MIT · 发布者 ID `b226234e-c3c8-4223-9e58-7e9fadbb5bea`
+> `tianshu-media-desk` · 0.1.2 · MIT · 发布者 ID `b226234e-c3c8-4223-9e58-7e9fadbb5bea`
 > 天枢 TPI 2.0 插件，移植自 [`woniuniuniu/dsh-media-desk`](https://github.com/woniuniuniu/dsh-media-desk)（MIT）。
 > 复用了哪些文件、改了哪些、发行文案怎么写，见 PUBLISH.md。
 
@@ -158,7 +158,7 @@ python scripts/make-release.py <完整 40 位 commit>
 cd D:/Februus/.tmp-devkit && node cli.mjs validate <zip> --lane official_reviewed
 ```
 
-现成的产物有两个：`tianshu-media-desk-0.1.1.zip`（运行包，TPI 2.0，53176 字节）与 `tianshu-media-desk-0.1.1-tpi1.0.zip`（入库包，TPI 1.0，101831 字节），都挂在 GitHub Release `v0.1.1`。校验结果与 sha256 记在 PUBLISH.md。
+现成的产物有两个：`tianshu-media-desk-0.1.2.zip`（运行包，TPI 2.0，53220 字节）与 `tianshu-media-desk-0.1.2-tpi1.0.zip`（入库包，TPI 1.0，101928 字节），都挂在 GitHub Release `v0.1.2`（0.1.1 的旧产物留在 `v0.1.1`）。校验结果与 sha256 记在 PUBLISH.md。
 
 ## 装进天枢与发行通道
 
