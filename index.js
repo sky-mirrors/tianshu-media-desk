@@ -32,19 +32,24 @@ const LIST_LIMIT = 50
  */
 const TOOL_TIMEOUT = { media_export: 60_000, media_write: 480_000 }
 
+/** 导出只会把图片搬进 assets/：非图片文件（llm.json、state.json 之类）一个都别放进来。 */
+const IMAGE_EXT = /\.(png|jpg|jpeg|webp|gif|avif|bmp|svg)$/i
+
 /**
- * 图片 src 的边界校验：http(s) 地址、插件自己的 media 引用，或落在工作区/插件数据目录内的本地路径。
+ * 图片 src 的边界校验：http(s) 地址、插件自己的 media 引用，或落在工作区（或插件数据目录 files/）里的图片文件。
  * 过了这道门下游直接信任它——导出会按这个路径 copyFile。
  */
 function checkAssetSrc(raw, cwd, dataDir) {
   const text = typeof raw === 'string' ? raw.trim() : ''
   if (!text) throw new Error('图片路径为空')
   if (isHttpUrl(text) || isAssetRef(text)) return text
+  if (!IMAGE_EXT.test(text)) throw new Error(`只接受图片文件（png/jpg/jpeg/webp/gif/avif/bmp/svg）：${text}`)
   const absolute = isAbsolute(text) ? text : join(cwd, text)
-  const roots = [cwd, dataDir].map(root => root.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase())
+  // 数据目录只放开 files/：llm.json 里的 key、state.json 的全文都不能被搬进工作区。
+  const roots = [cwd, join(dataDir, 'files')].map(root => root.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase())
   const target = absolute.replace(/\\/g, '/').toLowerCase()
   if (roots.some(root => target === root || target.startsWith(`${root}/`))) return text
-  throw new Error(`图片路径不在工作区或插件数据目录里：${text}`)
+  throw new Error(`图片路径不在工作区或插件数据目录里（数据目录只放行 files/ 下的图片）：${text}`)
 }
 
 /** id 允许写前缀：agent 从列表里复制半截也能用，只要唯一。 */
@@ -415,14 +420,17 @@ export default defineTianshuPlugin({
         // 宿主没给 shell（本地宿主、测试直调 execute）时，插件自己就在 Node 里，直接写。
         let result
         if (host.shell?.run) {
-          const jobFile = join(dataDir, `export-${Date.now()}.json`)
+          // 文件名带 pid 与随机后缀：同一毫秒内两次并发导出不会撞名。
+          const jobFile = join(dataDir, `export-${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}.json`)
           const resultFile = `${jobFile}.result.json`
           // 临时文件里装着整篇成稿：成功失败都要删，否则数据目录会一直长。
           try {
             await writeFile(jobFile, JSON.stringify({ production: item.production, item, dir }))
             let runError = null
             try {
-              await host.shell.run(`"${process.execPath}" "${WORKER}" --job "${jobFile}"`, { timeoutMs: 60_000 })
+              // 命令是宿主的 shell 字符串：三个路径都套引号，并把路径内部的双引号转义。
+              const quoted = path => `"${String(path).replace(/"/g, '\\"')}"`
+              await host.shell.run(`${quoted(process.execPath)} ${quoted(WORKER)} --job ${quoted(jobFile)}`, { timeoutMs: 60_000 })
             } catch (err) {
               // worker 非零退出时也会写 result.json（含它自己的错误原因），优先用那份。
               runError = err

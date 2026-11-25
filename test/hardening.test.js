@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { after, before, test } from 'node:test'
 
@@ -81,7 +81,8 @@ test('图片 src 只在工作区与插件数据目录内放行，外面的路径
   const id = await newItem('图片路径边界')
   await call('media_save', { id, kind: 'plan', plan: { title: '边界', outline: ['一'] } })
 
-  const outside = join(root, 'outside.txt')
+  // 用 .png 后缀：这条测的是越界判据，别让扩展名判据先拦住
+  const outside = join(root, 'outside.png')
   await writeFile(outside, 'secret')
   const rejected = await call('media_save', { id, kind: 'image', target: 'cover', src: outside })
   assert.equal(rejected.isError, true)
@@ -157,4 +158,28 @@ test('/rpc 只认 application/json，并用 Origin 挡跨源写操作', async ()
   } finally {
     child.kill()
   }
+})
+
+// 审核报告 P2-2：数据目录里的 llm.json（带 key）曾被当成图片复制进工作区。
+test('插件数据目录里的凭据文件不能当图片导出', async () => {
+  const id = await newItem('凭据外泄探针')
+  await call('media_save', { id, kind: 'plan', plan: { title: '探针', outline: ['一'] } })
+
+  const secret = join(dataDir, 'llm.json')
+  await writeFile(secret, JSON.stringify({ baseUrl: 'https://api.example', key: 'sk-probe-SECRET' }))
+  const rejected = await call('media_save', { id, kind: 'image', target: 'cover', src: secret })
+  assert.equal(rejected.isError, true, rejected.content)
+  assert.match(rejected.content, /只接受图片文件/)
+
+  // 工作区里的非图片同样不行：assets/ 只该放图片
+  const notes = join(workDir, 'notes.md')
+  await writeFile(notes, '正文')
+  const nonImage = await call('media_save', { id, kind: 'image', target: 'cover', src: notes })
+  assert.equal(nonImage.isError, true, nonImage.content)
+
+  // 数据目录只放行 files/ 下的图片
+  const inFiles = join(dataDir, 'files', 'pic.png')
+  await mkdir(dirname(inFiles), { recursive: true })
+  await writeFile(inFiles, 'png')
+  assert.notEqual((await call('media_save', { id, kind: 'image', target: 'cover', src: inFiles })).isError, true)
 })
