@@ -158,7 +158,7 @@ python scripts/make-release.py <完整 40 位 commit>
 cd D:/Februus/.tmp-devkit && node cli.mjs validate <zip> --lane official_reviewed
 ```
 
-现成的产物是 `tianshu-media-desk-0.1.1.zip`（52546 字节，23 个条目），已挂在 GitHub Release `v0.1.1`。校验结果与 sha256 记在 PUBLISH.md。
+现成的产物有两个：`tianshu-media-desk-0.1.1.zip`（运行包，TPI 2.0，53176 字节）与 `tianshu-media-desk-0.1.1-tpi1.0.zip`（入库包，TPI 1.0，101831 字节），都挂在 GitHub Release `v0.1.1`。校验结果与 sha256 记在 PUBLISH.md。
 
 ## 装进天枢与发行通道
 
