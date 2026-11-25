@@ -3,7 +3,7 @@
   "kind": "tianshu.plugin",
   "id": "media-desk",
   "displayName": "自媒体工作台",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "一句话记灵感，然后做出脚本、标题、封面、配图和分镜。工作台状态经 promptContext 写进每轮对话，一键成稿用宿主已配置的模型，不需要另配密钥。移植自 dsh-media-desk（MIT）。",
   "entry": "index.js",
   "runtime": "agent",

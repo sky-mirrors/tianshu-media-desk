@@ -12,11 +12,11 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
-OUT = os.path.join(ROOT, 'tianshu-media-desk-0.1.1.zip')
+OUT = os.path.join(ROOT, 'tianshu-media-desk-0.1.2.zip')
 SEP = '\\'
 
 PUBLISHER_ID = 'b226234e-c3c8-4223-9e58-7e9fadbb5bea'
-RELEASE_ID = 'rel_media_desk_011'
+RELEASE_ID = 'rel_media_desk_012'
 
 
 def sha256_of(path):

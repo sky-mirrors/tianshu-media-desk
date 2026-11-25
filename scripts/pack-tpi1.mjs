@@ -16,11 +16,11 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(ROOT, 'dist')
 const SOURCE = join(ROOT, '.local-data', 'tpi1-src')
-const OUT = join(ROOT, 'tianshu-media-desk-0.1.1-tpi1.0.zip')
+const OUT = join(ROOT, 'tianshu-media-desk-0.1.2-tpi1.0.zip')
 const DEVKIT = resolve(process.argv[2] ?? process.env.TIANSHU_DEVKIT ?? join('D:/Februus/.tmp-devkit'))
 const MANIFEST_1_0 = join(ROOT, 'tianshu.plugin.1.0.json')
 // 与 2.0 包的 release_id 分开：同一个 release_id 挂着两份不同产物，平台那边会打架。
-const RELEASE_ID = 'rel_media_desk_011_tpi10'
+const RELEASE_ID = 'rel_media_desk_012_tpi10'
 const PUBLISHER_ID = 'b226234e-c3c8-4223-9e58-7e9fadbb5bea'
 
 if (!existsSync(join(DIST, 'index.js'))) throw new Error('dist/ 还没生成：先跑 node scripts/pack-release.mjs')

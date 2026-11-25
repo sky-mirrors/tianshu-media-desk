@@ -11,7 +11,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'dist')
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'tianshu-media-desk-0.1.1.zip')
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'tianshu-media-desk-0.1.2.zip')
 SEP = '\\'
 
 if not os.path.isdir(SRC):

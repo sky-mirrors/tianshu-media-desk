@@ -1,6 +1,6 @@
 {
   "name": "tianshu-media-desk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "TPI 2.0 plugin for Tianshu: idea ledger, creation briefs, one-click drafting via the host model, and Markdown export.",
   "type": "module",
