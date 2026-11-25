@@ -64,7 +64,7 @@ source_commit   : 53a0a63332840ae20b15365d0bd9a26b0dd3930b
 release         : v0.1.1（23 条目；从 Release 下载回来算 sha256，与本地一致）
 ```
 
-回溯：0.1.0 时期那份 `$tpi: "1.0"` 的包曾通过官方 lane（`artifact_sha256 194cd41d…`，64186 字节）。切到 2.0 后这条通道就关上了，两者不可兼得。
+回溯：0.1.0 时期那份 `$tpi: "1.0"` 的包曾通过官方 lane（`artifact_sha256 194cd41d…`，64186 字节）。切到 2.0 后这条通道就关上了——所以运行包与入库包拆成两份产物，见下节「入库包（TPI 1.0）」。
 
 四条来自校验器的硬约束（踩过的）：
 
@@ -74,6 +74,35 @@ release         : v0.1.1（23 条目；从 Release 下载回来算 sha256，与�
 4. **ZIP 条目必须 `/` 分隔**。Windows 的 .NET `CreateFromDirectory` 会写成 `\`。
 
 清单按 TPI 2.0 写：插件跑在隔离沙箱、没有 Node 权限，所以 `media_export` 走 `host.shell.run` 起 `lib/export-worker.mjs`，在宿主进程里写盘（宿主没给 `shell` 时才由插件自己写）。面板经 `contributes.ui` 挂 `views/desk.html`。状态注入由 `lifecycle: ["turnStart"]` 钩子触发——`promptContext.setBlock` 只在 preTurn 窗口能过宿主的 phase 门，工具调用期间推无效。`media_export` 的 `dir` 声明 `pathParams: { dir: 'write' }`，宿主 `wrapTpiTool` 在边界做 `validatePathSafe`。
+
+## 入库包（TPI 1.0）
+
+插件库准入 schema 只收 `$tpi: "1.0"`，`capabilities` 枚举里也没有 `workspace` / `shell` / `ui`（等价于 `devkit src/artifacts.ts:57` 的 `z.literal('1.0')` 与 `:65` 的 enum）。所以运行包与入库包是两份产物：
+
+```bash
+node scripts/pack-release.mjs              # dist/（2.0，宿主运行时用）
+node scripts/make-release.py <40 位 commit> # tianshu-media-desk-0.1.1.zip（2.0 本机包）
+node scripts/pack-tpi1.mjs                 # tianshu-media-desk-0.1.1-tpi1.0.zip（入库包）
+```
+
+入库包从 `dist/` 派生一份源目录：换成 `tianshu.plugin.1.0.json`、去掉 `views/`（1.0 没有 `contributes.ui`，面板不会挂）、去掉生成元数据（官方 pack 拒绝源目录里带 `xiaosi.release.json` / `xiaosi.contents.json`），再由官方 devkit 的 `pack` 算 `permission_digest` 与 `xiaosi.contents/1`。
+
+实测（2026-11-25，本机 devkit）：
+
+```json
+$ node cli.mjs validate tianshu-media-desk-0.1.1-tpi1.0.zip --lane official_reviewed
+{ "valid": true,
+  "release_id": "rel_media_desk_011_tpi10",
+  "artifact_sha256": "58e958f3a4101169894094ed9dcf6b1d225bdb09bad854427346ad71e0b047b7",
+  "artifact_bytes": 100543,
+  "compatibility": { "tpi": "1.0", "core": ">=4.1.0", "platforms": ["win32-x64"] } }
+```
+
+宿主自己的读取器同样认可：`readTpiManifest(解压目录) -> ok true，$tpi 1.0，issues []`。
+
+取舍：1.0 包**不挂面板**（`contributes.ui` 只有 2.0 有），导出走插件自身的 fs 写盘（1.0 没有 `host.shell`；`index.js` 里 `if (!host.ui) return api` 与 `if (host.shell?.run)` 两条降级路径已在）。1.0 路径下的运行时加载未在本机实测——那需要宿主按 1.0 语义加载并 activate 一次。
+
+两个包的 release_id 分开：2.0 是 `rel_media_desk_011`，1.0 是 `rel_media_desk_011_tpi10`——同一个 release_id 挂两份不同产物会让平台记账打架。
 
 ## 提交文案（插件库）
 
@@ -104,7 +133,7 @@ release         : v0.1.1（23 条目；从 Release 下载回来算 sha256，与�
 - `media_export` 增加 `pathParams: { dir: 'write' }`，越界路径由宿主在边界拒绝。
 - 发行包 23 个条目（52,546 字节，`artifact_sha256 0f4434bc…`），含 `views/` 与 `lib/export-worker.mjs` / `lib/time.js`。
 - 审查加固（重新打的这一份）：`media_write` 工具超时 20s → 480s（覆盖两次模型调用的 420s 预算）；导出临时 `export-*.json` 用完即删（失败路径同样清理）；图片 src 收边界；本地服务 `/rpc` 只收 JSON 并拒跨源；上下文块 rejection 就地吞掉；state 写入去掉全量深拷贝（3MB 19.5 → 14.1 ms，15MB 68.2 → 48.9 ms，RSS 237 → 204 MB）；清掉 16 个无调用方 handler（`src/ops.js` 426 → 320 行）与不可达中英分支，`whenText` 收敛到 `lib/time.js`；面板补 aria-label / aria-pressed / `role="dialog"` / Esc 关闭 / 焦点归还。
-- 限制：TPI 2.0 清单过不了插件库准入，这份包只用于本机安装。实测官方 lane 有两道闸同时拒绝：`path=["$tpi"]`（`expected "1.0"`）与 `path=["capabilities",2]`（只收 `tools|storage|account|embeddings|sidePathLLM|promptContext|transcripts|log`）。
+- 限制：TPI 2.0 清单过不了插件库准入，这份包只用于本机安装；入库走 `tianshu-media-desk-0.1.1-tpi1.0.zip`（见「入库包（TPI 1.0）」）。实测官方 lane 有两道闸同时拒绝：`path=["$tpi"]`（`expected "1.0"`）与 `path=["capabilities",2]`（只收 `tools|storage|account|embeddings|sidePathLLM|promptContext|transcripts|log`）。
 
 ### 版本变更说明（v0.1.0）
 

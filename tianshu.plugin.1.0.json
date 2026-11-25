@@ -1,0 +1,26 @@
+{
+  "$tpi": "1.0",
+  "kind": "tianshu.plugin",
+  "id": "media-desk",
+  "displayName": "自媒体工作台",
+  "version": "0.1.1",
+  "description": "一句话记灵感，然后做出脚本、标题、封面、配图和分镜。工作台状态经 promptContext 写进每轮对话，一键成稿用宿主已配置的模型，不需要另配密钥。移植自 dsh-media-desk（MIT）。",
+  "entry": "index.js",
+  "runtime": "agent",
+  "engines": { "tianshu": ">=4.1.0" },
+  "capabilities": ["tools", "storage", "sidePathLLM", "promptContext", "log"],
+  "permissions": { "fs": true },
+  "contributes": {
+    "tools": [
+      { "name": "media_idea", "description": "把一句话灵感、链接或图片记进工作台，返回条目 id 供后续 media_brief / media_save 使用。" },
+      { "name": "media_list", "description": "列出灵感与成稿，按状态/平台/关键词筛；每条一行：id·状态·标题·平台·排期。" },
+      { "name": "media_item", "description": "看一条详情（大纲、成稿、画面槽位），或改字段、改状态、排期、删除。" },
+      { "name": "media_brief", "description": "取创作简报：体裁写法、策划案 JSON 字段、当前风格卡与写作规则、已有成稿。" },
+      { "name": "media_save", "description": "回写策划案、正文、草稿、画面槽位、风格卡、数据与写作规则。" },
+      { "name": "media_write", "description": "一键成稿：用天枢已配置的模型按简报生成策划案与正文并直接落库，无需另配密钥。" },
+      { "name": "media_export", "description": "把成稿导出成一份 Markdown（正文、图注、分镜表）与 assets/ 图片到工作区。" }
+    ],
+    "lifecycle": ["turnStart"],
+    "skills": []
+  }
+}
