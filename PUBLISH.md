@@ -81,20 +81,20 @@ release         : v0.1.1（23 条目；从 Release 下载回来算 sha256，与�
 
 本插件只在**本机**保存你自己写的内容：灵感、成稿、草稿、风格卡、写作规则、排期与复盘数据。
 
-- **存在哪**：`<数据根>/plugin-data/media-desk/state.json`（Windows 上是 `%LOCALAPPDATA%\.rivet\plugin-data\media-desk\`），一个明文 JSON 文件，不加密。图片等素材在同目录 `files/`。
+- **存在哪**：`<数据根>/plugin-data/media-desk/state.json`（本机实测为 `C:\Users\Administrator\.rivet\plugin-data\media-desk\`；可用 `MEDIA_DESK_DATA` 指到别处），一个明文 JSON 文件，不加密、不压缩。同目录还有 `files/`（预留给素材，**插件自己不往里写**）、`exports/`（面板导出的成品），以及**仅本地运行版**在面板里填过模型 Key 时才会出现的 `llm.json`（明文保存 baseUrl / key / model）。这些文件本机同账户下任何程序都能读，要更强的保护得靠磁盘加密或独占机器。
 - **谁能读**：只有本插件。宿主按插件隔离数据目录，其他插件拿不到。
 - **会上传吗**：不会。插件没有遥测、没有账号体系、没有远程日志、不检查更新。
-- **写工作区**：只有你主动点导出（`media_export`）时，才按你给的目录写 Markdown 与 `assets/` 图片。
-- **和模型的关系**：只有你主动点「让模型成稿」时，该条目的标题、正文与风格卡才会作为提示词的一部分交给模型；模型由天枢宿主提供，插件不直接联网、不自建通道、不保存模型返回以外的数据。
+- **写工作区与读图**：只在你主动导出（`media_export` 或面板「导出 Markdown」）时，按你给的目录写 Markdown 与 `assets/` 图片。导出会**读取**你指定的图片文件，且只放行 http(s)、插件自己的 media 引用、以及落在工作区或插件数据目录内的本地路径，越界路径直接拒绝。
+- **和模型的关系**：只有你主动跑 `media_write`（或点面板的「让模型成稿」）时，才会把**该条目**的 标题 / 补充 / 标签 / 来源 / 链接 / 创作角度 / 上一级灵感标题，加上当前风格卡全字段、作者原文节选（≤6000 字）、启用中的写作规则、已有成稿的 标题 / 封面大字 / 事实 / 小标题，一起作为提示词交给宿主提供的模型；插件不直接联网、不自建通道、不保存模型返回以外的数据。每轮对话推的上下文块只有 标题 / id / 状态 / 排期 / 风格卡名与摘要，**不含正文**。
 
 ### 外部服务与费用
 
 - **插件本体**：免费，MIT，无内购、无订阅、无试用期、无按次计费、无账号绑定。
 - **必需的外部服务**：没有。不配模型也能记灵感、看板、排期、手动回写正文、导出 Markdown。
 - **可选的外部服务**：一键成稿走天枢宿主的 `sidePathLLM`（你已配置的模型）。**费用由你向模型服务商支付，本插件不代收、不加价、不抽成**；不点这个按钮就不产生调用。
-- **本地运行版**（`scripts/serve.mjs`，不经宿主）：只有你自己设置 `MEDIA_DESK_LLM_BASE_URL` / `MEDIA_DESK_LLM_KEY` / `MEDIA_DESK_LLM_MODEL` 三个环境变量后才会访问你指定的那个端点；不设就完全不联网。它起的是绑定 `127.0.0.1` 的本地页面服务。
+- **本地运行版**（`scripts/serve.mjs`，不经宿主）：只有你自己设了 `MEDIA_DESK_LLM_BASE_URL` / `MEDIA_DESK_LLM_KEY` / `MEDIA_DESK_LLM_MODEL`，或在面板里填了模型配置，才会访问你指定的那个端点（代码里就是 `baseUrl` + `/chat/completions`，带 `Authorization: Bearer <key>`）；不配就完全不联网。它起的是绑定 `127.0.0.1` 的本地页面服务，`/rpc` 只接受 `application/json` 并拒绝跨源 `Origin`。
 - **第三方依赖**：零。`package.json` 没有 `dependencies` 也没有 `devDependencies`，插件主体（`index.js` / `lib/` / `src/`）里没有任何 `fetch` 或 HTTP 调用。
-- **不接触的端点**：无更新检查、无遥测上报、无许可校验服务器、无第三方统计。
+- **不接触的端点**：无更新检查、无遥测上报、无许可校验服务器、无第三方统计；面板不加载任何外部 CDN 资源（`desk.html` 只引用同目录的 `desk.css` / `desk.js`）。
 
 ### 版本变更说明（v0.1.1）
 
@@ -102,8 +102,9 @@ release         : v0.1.1（23 条目；从 Release 下载回来算 sha256，与�
 - `media_export` 恢复沙箱路径：`host.shell.run` 起 `lib/export-worker.mjs` 在宿主进程写盘；宿主没给 `shell`（本地宿主/测试直调）时插件自己写。
 - 状态上下文改由 `turnStart` 生命周期钩子推送（激活时推会被宿主的 phase 门拦掉）。
 - `media_export` 增加 `pathParams: { dir: 'write' }`，越界路径由宿主在边界拒绝。
-- 发行包 22 个文件，含 `views/` 与 `lib/export-worker.mjs`。
-- 限制：TPI 2.0 清单过不了插件库准入（官方 lane 只收 `$tpi: "1.0"`），这份包只用于本机安装。
+- 发行包 23 个条目（52,546 字节，`artifact_sha256 0f4434bc…`），含 `views/` 与 `lib/export-worker.mjs` / `lib/time.js`。
+- 审查加固（重新打的这一份）：`media_write` 工具超时 20s → 480s（覆盖两次模型调用的 420s 预算）；导出临时 `export-*.json` 用完即删（失败路径同样清理）；图片 src 收边界；本地服务 `/rpc` 只收 JSON 并拒跨源；上下文块 rejection 就地吞掉；state 写入去掉全量深拷贝（3MB 19.5 → 14.1 ms，15MB 68.2 → 48.9 ms，RSS 237 → 204 MB）；清掉 16 个无调用方 handler（`src/ops.js` 426 → 320 行）与不可达中英分支，`whenText` 收敛到 `lib/time.js`；面板补 aria-label / aria-pressed / `role="dialog"` / Esc 关闭 / 焦点归还。
+- 限制：TPI 2.0 清单过不了插件库准入，这份包只用于本机安装。实测官方 lane 有两道闸同时拒绝：`path=["$tpi"]`（`expected "1.0"`）与 `path=["capabilities",2]`（只收 `tools|storage|account|embeddings|sidePathLLM|promptContext|transcripts|log`）。
 
 ### 版本变更说明（v0.1.0）
 

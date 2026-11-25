@@ -99,12 +99,13 @@ node scripts/serve.mjs
 `~/.rivet/plugin-data/media-desk/` 下：
 
 - `state.json` — 明文 JSON，不加密。字段：`items`（灵感与成稿）、`styles`（风格卡）、`skills`（写作规则）、`metrics`（复盘数据）、`people`、`angles`、`accounts`、`chat`、`activeStyleId`、`draftFormat`。首次读取自动建空台账。
-- `files/` — 图片等素材。
+- `files/` — 预留给素材的目录，插件自己不往里写。
+- `llm.json` — 只有本地运行版（`scripts/serve.mjs`）在面板里填过模型配置时才出现，明文保存 `baseUrl` / `key` / `model`。
 
 边界：
 
 - **会发给模型吗**：台账不主动外发。每轮对话推的上下文块只有标题、id、状态、排期与风格卡名，不含正文。正文只在你调用 `media_write`（或点「让模型成稿」）时，作为提示词的一部分交给宿主已配置的模型。插件自身没有网络能力——`capabilities` 不含网络项，`permissions` 只有 `workspace` 与 `shell`。
-- **写工作区吗**：只在你主动 `media_export` 时，按你给的目录写 Markdown 与 `assets/` 图片。
+- **写工作区吗**：只在你主动 `media_export`（或点面板「导出 Markdown」）时，按你给的目录写 Markdown 与 `assets/` 图片。导出会读取你指定的图片文件，但只放行 http(s)、插件自己的 media 引用，以及落在工作区或插件数据目录内的本地路径。
 - **怎么删**：删 `~/.rivet/plugin-data/media-desk/` 整个目录即全量清除；单条用 `media_item` 的 `delete` 动作。卸载插件不会自动删数据。
 
 ## 代码结构
