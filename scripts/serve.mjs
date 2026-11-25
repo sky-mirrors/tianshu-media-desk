@@ -4,10 +4,10 @@
 // 面板本来是宿主 iframe 里的页面，用 postMessage 和插件通信。这里起一个本地 HTTP 服务，
 // 把同一份 views/ 静态文件发出去，并把 postMessage 换成 POST /rpc —— 面板代码只多一条传输分支。
 import { createServer } from 'node:http'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 
-import { loadPlugin, pluginDir } from './host.mjs'
+import { loadPlugin, pluginDir, llmConfigPath, readLLMConfig, makeSidePathLLM } from './host.mjs'
 
 const args = process.argv.slice(2)
 const argOf = (name, fallback) => {
@@ -27,7 +27,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
 }
 
-const { api, dataDir, preTurn } = await loadPlugin({ quiet: true, onBlock: (block) => {
+const { api, dataDir, preTurn, host: pluginHost } = await loadPlugin({ quiet: true, onBlock: (block) => {
   console.log('\n— 上下文块（宿主里会写进每轮对话）—')
   console.log(block)
 } })
@@ -59,7 +59,31 @@ const server = createServer(async (req, res) => {
 
   try {
     if (url.pathname === '/rpc' && req.method === 'POST') {
+      // 只收 application/json：浏览器跨源发这个 content-type 必须走 preflight，本服务不回 CORS 头，
+      // 请求就发不出去。没有这道门，任意网页能用 text/plain 简单请求直接改台账和模型配置。
+      const contentType = String(req.headers['content-type'] ?? '').toLowerCase()
+      if (!contentType.startsWith('application/json')) return send(415, { error: 'content-type 必须是 application/json' })
+      const origin = req.headers.origin
+      if (origin && origin !== `http://${host}:${port}`) return send(403, { error: '跨源请求被拒绝' })
       const payload = JSON.parse(await readBody(req))
+      // 面板里的模型配置：写到 llm.json 并当场换掉 sidePathLLM，不用重启服务。
+      if (payload.type === 'config') {
+        if (payload.action === 'get') {
+          const cfg = await readLLMConfig()
+          return send(200, { value: { configured: Boolean(cfg), model: cfg?.model ?? '', baseUrl: cfg?.baseUrl ?? '', source: cfg?.source ?? '' } })
+        }
+        const next = {
+          baseUrl: String(payload.baseUrl ?? '').trim(),
+          key: String(payload.key ?? '').trim(),
+          model: String(payload.model ?? '').trim(),
+        }
+        if (!next.baseUrl || !next.model) return send(400, { error: 'baseUrl 与 model 必填' })
+        await writeFile(llmConfigPath, JSON.stringify(next, null, 2), 'utf8')
+        const llm = makeSidePathLLM({ ...next, source: 'file' })
+        if (llm) pluginHost.sidePathLLM = llm
+        else delete pluginHost.sidePathLLM
+        return send(200, { value: { configured: Boolean(llm), model: next.model, baseUrl: next.baseUrl, source: 'file' } })
+      }
       await preTurn()
       const value = await api.ui.onMessage('desk', payload)
       return send(200, { value })

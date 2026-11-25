@@ -6,11 +6,11 @@
   --card: #fff;
   --accent: #a4642a;
   --bad: #b3261e;
-  --idea: #8a7f6d;
-  --outline: #6b7f8a;
-  --draft: #8a7a4a;
-  --ready: #3f7a52;
-  --published: #5c5c8a;
+  --idea: #8c98a4;
+  --outline: #5f83a8;
+  --draft: #b8873f;
+  --ready: #4f8c63;
+  --published: #7a6aa8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -88,7 +88,7 @@ h1 { font-size: 15px; margin: 0; font-weight: 650; }
   position: fixed;
   right: 0;
   bottom: 0;
-  width: min(420px, 100%);
+  width: min(560px, 100%);
   max-height: 82vh;
   overflow: auto;
   background: var(--card);
@@ -113,6 +113,7 @@ h1 { font-size: 15px; margin: 0; font-weight: 650; }
 }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 12px; }
 .field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); }
+.field select, .field input { min-width: 150px; }
 select, input, button {
   font: inherit;
   color: var(--fg);
@@ -127,6 +128,13 @@ button.danger { color: var(--bad); }
 button.primary { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 button[disabled] { opacity: .55; cursor: default; }
 .hint { margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.label { margin: 12px 0 4px; color: var(--muted); font-size: 12px; }
+.article { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; font: inherit; font-size: 13px; line-height: 1.6; max-height: 320px; overflow: auto; }
+.llm { display: grid; gap: 14px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+/* display:grid 会压过 [hidden] 的默认 display:none，这条把它还回去。 */
+.llm[hidden] { display: none; }
+/* Key 与下一个字段之间再留两行，别让三个输入框糊成一块。 */
+.llm .key-field { margin-bottom: 40px; }
 .toast {
   position: fixed;
   left: 50%;

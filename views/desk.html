@@ -13,20 +13,23 @@
     <p class="stat" id="stat" data-state="unknown">加载中…</p>
   </div>
   <form class="new" id="new">
-    <input id="new-text" type="text" autocomplete="off" placeholder="一句话灵感，回车记下">
+    <input id="new-text" type="text" autocomplete="off" aria-label="一句话灵感" placeholder="一句话灵感，回车记下">
     <button type="submit">记下</button>
   </form>
-  <nav id="filters" class="filters"></nav>
+  <nav id="filters" class="filters" aria-label="按状态筛选"></nav>
 </header>
 <main>
-  <ul class="cards" id="cards"></ul>
+  <ul class="cards" id="cards" aria-label="灵感条目"></ul>
   <p class="empty" id="empty" hidden>还没有灵感。在上面输入一句话，回车就记下；要写稿就点条目里的「让模型成稿」。</p>
 </main>
-<aside class="detail" id="detail" hidden>
+<aside class="detail" id="detail" role="dialog" aria-label="条目详情" hidden>
   <button class="close" id="close" aria-label="关闭">×</button>
   <h2 id="d-title"></h2>
   <p class="meta" id="d-meta"></p>
   <p class="body" id="d-body"></p>
+  <p class="label" id="d-article-label" hidden>成稿</p>
+  <pre class="article" id="d-article" hidden></pre>
+  <p class="meta" id="d-saved" hidden></p>
   <div class="actions">
     <label class="field">状态
       <select id="d-status">
@@ -42,11 +45,19 @@
     </label>
     <button id="d-save">保存</button>
     <button id="d-write" class="primary">让模型成稿</button>
+    <button id="d-export" hidden>导出 Markdown</button>
     <button id="d-del" class="danger">删除</button>
+  </div>
+  <div class="llm" id="llm-box" hidden>
+    <p class="label">接模型（本地宿主需要；天枢里用宿主已配的模型）</p>
+    <label class="field">Base URL<input id="llm-base" type="url" autocomplete="off" placeholder="https://api.example.com/v1"></label>
+    <label class="field key-field">Key<input id="llm-key" type="password" autocomplete="off" placeholder="可留空"></label>
+    <label class="field">模型<input id="llm-model" type="text" autocomplete="off" placeholder="模型名"></label>
+    <button id="llm-save">保存</button>
   </div>
   <div class="hint" id="d-hint" hidden></div>
 </aside>
-<p class="toast" id="toast" hidden></p>
+<p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
 <script src="desk.js"></script>
 </body>
 </html>

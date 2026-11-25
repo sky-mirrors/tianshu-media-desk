@@ -39,18 +39,40 @@ export function makeShell() {
   }
 }
 
+export const llmConfigPath = join(defaultDataDir, 'llm.json')
+
 /**
- * sidePathLLM：宿主把它接到已配置的模型上。这里只在用户显式给了环境变量时才接，
- * 不去翻本机的密钥文件——那不是这个脚本该做的事。
+ * 模型配置：环境变量优先（启动时给的），否则读 llm.json（面板里填的那份）。
+ * @returns {Promise<{baseUrl: string, key: string, model: string, source: 'env'|'file'} | null>}
+ */
+export async function readLLMConfig() {
+  const env = {
+    baseUrl: process.env.MEDIA_DESK_LLM_BASE_URL,
+    key: process.env.MEDIA_DESK_LLM_KEY,
+    model: process.env.MEDIA_DESK_LLM_MODEL,
+  }
+  if (env.baseUrl && env.key && env.model) return { ...env, source: 'env' }
+  try {
+    const raw = JSON.parse(await readFile(llmConfigPath, 'utf8'))
+    if (raw?.baseUrl && raw?.model) {
+      return { baseUrl: String(raw.baseUrl), key: String(raw.key ?? ''), model: String(raw.model), source: 'file' }
+    }
+  } catch {
+    // 没有配置文件就是没配：不猜内容，也不自己造一份。
+  }
+  return null
+}
+
+/**
+ * sidePathLLM：把插件接到一个 OpenAI 兼容端点上。这里只在给了配置时才接，
+ * 不去翻本机的密钥文件。
  *   MEDIA_DESK_LLM_BASE_URL  https://api.example.com/v1
- *   MEDIA_DESK_LLM_KEY       sk-...
+ *   MEDIA_DESK_LLM_KEY       sk-...（留空则不发 Authorization）
  *   MEDIA_DESK_LLM_MODEL     deepseek-v4-pro
  */
-export function makeSidePathLLM() {
-  const baseUrl = process.env.MEDIA_DESK_LLM_BASE_URL
-  const key = process.env.MEDIA_DESK_LLM_KEY
-  const model = process.env.MEDIA_DESK_LLM_MODEL
-  if (!baseUrl || !key || !model) return undefined
+export function makeSidePathLLM(config) {
+  if (!config?.baseUrl || !config?.model) return undefined
+  const { baseUrl, key, model } = config
 
   return {
     available: () => true,
@@ -58,7 +80,7 @@ export function makeSidePathLLM() {
     complete: async (messages, options = {}) => {
       const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+        headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
         body: JSON.stringify({ model, messages, max_tokens: 4000 }),
         signal: options.signal ?? AbortSignal.timeout(options.timeoutMs ?? 180_000),
       })
@@ -115,7 +137,7 @@ export async function loadPlugin(options = {}) {
     },
   }
 
-  const sidePathLLM = makeSidePathLLM()
+  const sidePathLLM = makeSidePathLLM(await readLLMConfig())
   if (sidePathLLM) host.sidePathLLM = sidePathLLM
 
   await mkdir(dataDir, { recursive: true })

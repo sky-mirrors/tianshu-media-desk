@@ -9,7 +9,7 @@
  *
  * 状态只有一个写入口：src/ops.js 的 applyOps（白名单字段校验），工具与面板都走它。
  */
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, unlink, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -20,11 +20,32 @@ import { buildBrief, buildStyleBrief } from './lib/brief.js'
 import { buildContextBlock } from './lib/context.js'
 import { ARTICLE_SYSTEM, PLAN_SYSTEM, extractJson, textOf } from './lib/llm.js'
 import { itemLine, renderItem, renderList, renderReceipts } from './lib/render.js'
-import { KINDS, PLATFORMS, STATUSES, applyOps } from './src/ops.js'
+import { KINDS, PLATFORMS, STATUSES, applyOps, isAssetRef, isHttpUrl } from './src/ops.js'
 import { exportProduction, slugify } from './src/export.js'
 
 const WORKER = fileURLToPath(new URL('./lib/export-worker.mjs', import.meta.url))
 const LIST_LIMIT = 50
+
+/**
+ * 工具级超时。media_write 串两次旁路模型调用（180s + 240s），预算必须盖住它，
+ * 否则宿主会在第一次调用还没回来时就切断工具。
+ */
+const TOOL_TIMEOUT = { media_export: 60_000, media_write: 480_000 }
+
+/**
+ * 图片 src 的边界校验：http(s) 地址、插件自己的 media 引用，或落在工作区/插件数据目录内的本地路径。
+ * 过了这道门下游直接信任它——导出会按这个路径 copyFile。
+ */
+function checkAssetSrc(raw, cwd, dataDir) {
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  if (!text) throw new Error('图片路径为空')
+  if (isHttpUrl(text) || isAssetRef(text)) return text
+  const absolute = isAbsolute(text) ? text : join(cwd, text)
+  const roots = [cwd, dataDir].map(root => root.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase())
+  const target = absolute.replace(/\\/g, '/').toLowerCase()
+  if (roots.some(root => target === root || target.startsWith(`${root}/`))) return text
+  throw new Error(`图片路径不在工作区或插件数据目录里：${text}`)
+}
 
 /** id 允许写前缀：agent 从列表里复制半截也能用，只要唯一。 */
 function resolveId(items, raw) {
@@ -50,7 +71,7 @@ const ideaTool = () => ({
     source: { type: 'string', description: '来源名称，如某公众号' },
     tags: { type: 'array', items: { type: 'string' }, description: '标签' },
     platform: { type: 'string', enum: PLATFORMS, description: '计划发布的平台' },
-    media: { type: 'json', description: '图片/视频：{src:"本地绝对路径或 http(s)", poster?:"封面帧"}' },
+    media: { type: 'json', description: '图片/视频：{src:"http(s) 地址，或工作区内的本地路径", poster?:"封面帧"}' },
     status: { type: 'string', enum: STATUSES, description: '初始状态，默认 idea' },
   },
 })
@@ -166,6 +187,9 @@ export default defineTianshuPlugin({
               title: item.production.title,
               coverText: item.production.coverText,
               words: item.production.article?.length ?? 0,
+              articlePreview: (item.production.article ?? '').slice(0, 600),
+              outline: (item.production.outline ?? []).slice(0, 6),
+              savedPath: item.production.savedPath ?? '',
               cover: item.production.cover?.src ?? '',
               images: (item.production.images ?? []).filter(row => row.src).length,
               shots: (item.production.shots ?? []).filter(row => row.src).length,
@@ -183,7 +207,8 @@ export default defineTianshuPlugin({
      */
     async function pushContext() {
       const block = buildContextBlock(await state.read())
-      if (block) void host.promptContext?.setBlock(block)
+      // setBlock 是宿主的异步接口：吞掉 rejection，否则 unhandledRejection 会打断宿主进程。
+      if (block) Promise.resolve(host.promptContext?.setBlock(block)).catch(() => {})
     }
 
     /** 面板与工具发来的写操作：只走 applyOps。整批全军覆没时抛错，让调用方看见失败。 */
@@ -241,7 +266,7 @@ export default defineTianshuPlugin({
         inputSchema: parametersToJsonSchema(parameters),
         // 宿主 wrapTpiTool 按这个声明做 validatePathSafe：越界/敏感路径在边界直接拒绝。
         ...(pathParams ? { pathParams } : {}),
-        timeoutMs: name === 'media_export' ? 60_000 : 20_000,
+        timeoutMs: TOOL_TIMEOUT[name] ?? 20_000,
         async execute({ args = {}, cwd }) {
           try {
             return { content: await run(name, args, cwd) }
@@ -269,7 +294,9 @@ export default defineTianshuPlugin({
           source: args.source,
           tags: args.tags,
           platform: args.platform,
-          media: args.media,
+          media: args.media && typeof args.media === 'object' && typeof args.media.src === 'string'
+            ? { ...args.media, src: checkAssetSrc(args.media.src, cwd, dataDir) }
+            : args.media,
           status: args.status,
         }]
         const result = await runOps(ops, '记灵感')
@@ -356,7 +383,7 @@ export default defineTianshuPlugin({
           return renderReceipts(result)
         }
         if (kind === 'image') {
-          const result = await runOps([{ op: 'attach_asset', id, target: args.target, src: args.src }], '写画面')
+          const result = await runOps([{ op: 'attach_asset', id, target: args.target, src: checkAssetSrc(args.src, cwd, dataDir) }], '写画面')
           return renderReceipts(result)
         }
         if (kind === 'draft') {
@@ -390,10 +417,24 @@ export default defineTianshuPlugin({
         if (host.shell?.run) {
           const jobFile = join(dataDir, `export-${Date.now()}.json`)
           const resultFile = `${jobFile}.result.json`
-          await writeFile(jobFile, JSON.stringify({ production: item.production, item, dir }))
-          await host.shell.run(`"${process.execPath}" "${WORKER}" --job "${jobFile}"`, { timeoutMs: 60_000 })
-          result = JSON.parse(await readFile(resultFile, 'utf8'))
-          if (!result.ok) throw new Error(result.error)
+          // 临时文件里装着整篇成稿：成功失败都要删，否则数据目录会一直长。
+          try {
+            await writeFile(jobFile, JSON.stringify({ production: item.production, item, dir }))
+            let runError = null
+            try {
+              await host.shell.run(`"${process.execPath}" "${WORKER}" --job "${jobFile}"`, { timeoutMs: 60_000 })
+            } catch (err) {
+              // worker 非零退出时也会写 result.json（含它自己的错误原因），优先用那份。
+              runError = err
+            }
+            const text = await readFile(resultFile, 'utf8').catch(() => '')
+            if (!text) throw runError ?? new Error('导出进程没有写回结果')
+            result = JSON.parse(text)
+            if (!result.ok) throw new Error(result.error)
+          } finally {
+            await unlink(jobFile).catch(() => {})
+            await unlink(resultFile).catch(() => {})
+          }
         } else {
           result = await exportProduction(item.production, item, { dir })
         }
@@ -431,6 +472,14 @@ export default defineTianshuPlugin({
           if (type === 'ops') {
             const result = await runOps(message.ops, '面板操作')
             return { receipts: result.receipts.map(row => row.text), errors: result.errors, state: await snapshot() }
+          }
+          if (type === 'export') {
+            const current = await state.read()
+            const item = current.items.find(row => row.id === message.id)
+            if (!item) throw new Error(`找不到条目：${message.id}`)
+            const dir = join(dataDir, 'exports', slugify(item.production?.title || item.title))
+            const text = await run('media_export', { id: item.id, dir }, host.cwd)
+            return { text, path: dir, state: await snapshot() }
           }
           return null
         },
