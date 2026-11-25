@@ -55,11 +55,13 @@ $ node cli.mjs validate tianshu-media-desk-0.1.1.zip --lane official_reviewed
 
 # 本机宿主自己的校验器（这份 2.0 包的服务对象）
 readTpiManifest(dist) -> ok，$tpi=2.0，capabilities 7 项
+dist 实加载（注入 TPI stub 后 activate）-> 7 个工具，media_write timeoutMs 480000，ui 已挂
 
-artifact_sha256 : 6a354bcfb47f4f1db09d8b5d02162800512e25a058a484fcfd7dbb493d18322c
-artifact_bytes  : 49304
+artifact_sha256 : 0f4434bc9d1667e26aa987ebbb4e73deab07101d99359366575c4e53bc644f0b
+artifact_bytes  : 52546
 compatibility   : tpi 2.0 / core >=4.1.0 / win32-x64
-source_commit   : f332b3c34e3c3e0b63b43931726b6544b6160f47
+source_commit   : 53a0a63332840ae20b15365d0bd9a26b0dd3930b
+release         : v0.1.1（23 条目；从 Release 下载回来算 sha256，与本地一致）
 ```
 
 回溯：0.1.0 时期那份 `$tpi: "1.0"` 的包曾通过官方 lane（`artifact_sha256 194cd41d…`，64186 字节）。切到 2.0 后这条通道就关上了，两者不可兼得。
